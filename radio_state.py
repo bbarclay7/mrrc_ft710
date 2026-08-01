@@ -79,6 +79,7 @@ class RadioState:
     split: bool = False                # ST;
     vox: bool = False                  # VX;
     break_in: bool = False             # BI;
+    tx_timeout_s: int = 300            # PTT safety: server forces RX if keyed this long (client-configurable)
 
     # ── Scope State ───────────────────────────────────────────────
     scope_on: bool = True              # SS01; scope display on/off
@@ -286,6 +287,7 @@ class RadioState:
             "split": self.split,
             "vox": self.vox,
             "break_in": self.break_in,
+            "tx_timeout_s": self.tx_timeout_s,
             # Scope
             "scope_on": self.scope_on,
             "scope_span": self.scope_span,

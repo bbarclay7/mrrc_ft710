@@ -168,8 +168,8 @@ class PollScheduler:
                                 if not await self._should_skip("if") and not await self._polling_paused():
                                     changes["vfo_a_freq"] = freq
                                     # Only log significant frequency changes (>1kHz) or periodically
-                                    if (freq != _last_logged_freq 
-                                            and abs(freq - _last_logged_freq) > 1000
+                                    if (_last_logged_freq is None
+                                            or abs(freq - _last_logged_freq) > 1000
                                             or _loop_count % 500 == 0):
                                         _delta = ""
                                         if _last_logged_freq is not None:
@@ -198,7 +198,7 @@ class PollScheduler:
             except asyncio.CancelledError:
                 return
             except Exception as e:
-                logger.debug("IF poll error: %s", e)
+                logger.warning("IF poll error: %s", e)
                 failures += 1
 
             if failures >= 5:

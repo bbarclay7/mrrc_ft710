@@ -85,6 +85,9 @@ _scope_proc: asyncio.subprocess.Process | None = None
 _scope_pipe_lock: asyncio.Lock | None = None
 _audio_rx_task: asyncio.Task | None = None
 _audio_tx_task: asyncio.Task | None = None
+_tx_watchdog_task: asyncio.Task | None = None
+_meter_clear_task: asyncio.Task | None = None
+METER_HOLD_S = 5.0  # PWR/SWR/ALC/COMP/Id linger this long after TX before clearing to zero
 
 # TX Opus decoder (browser mic → server)
 _opus_tx_decoder: TxOpusDecoder | None = None
@@ -93,6 +96,11 @@ _opus_tx_decoder: TxOpusDecoder | None = None
 AUDIO_RX_SEND_TIMEOUT = 0.012          # per-frame per-client timeout (seconds)
 AUDIO_RX_MAX_FRAMES_PER_CYCLE = 2      # cap burst send when loop catches up
 RX_SILENCE_ALERT_S = 20                # zero-audio watchdog: alert after this many seconds of bit-exact silence
+# PTT safety Layer 8: force RX if keyed this long, no matter what any client is
+# doing. Actual limit lives in radio.tx_timeout_s (client-configurable via
+# {"type":"set","field":"tx_timeout_s","value":N}); these just bound it.
+TX_TIMEOUT_MIN_S = 30
+TX_TIMEOUT_MAX_S = 1800
 METER_BROADCAST_LOG_INTERVAL_SECONDS = 0.5
 
 # Auth: valid session tokens (server-side, cleared on restart)
@@ -686,6 +694,74 @@ async def _audio_rx_loop():
         await asyncio.sleep(interval)
 
 
+def _cancel_meter_clear():
+    """Cancel a pending TX-meter clear — call this whenever a new TX starts,
+    so a stale timer from a previous, brief transmission can't wipe out the
+    current one's live readings partway through."""
+    global _meter_clear_task
+    if _meter_clear_task and not _meter_clear_task.done():
+        _meter_clear_task.cancel()
+    _meter_clear_task = None
+
+
+async def _clear_tx_meters_after_hold():
+    try:
+        await asyncio.sleep(METER_HOLD_S)
+    except asyncio.CancelledError:
+        return
+    radio.update(power_meter=0, alc_meter=0, swr_meter=0, comp_meter=0, id_meter=0)
+    await _broadcast_state()
+
+
+def _schedule_meter_clear():
+    """Let PWR/SWR/ALC/COMP/Id linger at their last TX reading instead of
+    blanking the instant PTT releases, so the operator can actually read them
+    — then clear to zero after METER_HOLD_S once nothing new has keyed up."""
+    global _meter_clear_task
+    _cancel_meter_clear()
+    _meter_clear_task = asyncio.create_task(_clear_tx_meters_after_hold(), name="meter_clear_hold")
+
+
+async def _tx_watchdog_loop():
+    """Force RX if the radio stays keyed longer than radio.tx_timeout_s.
+
+    Independent of any client or websocket state — every other PTT safety
+    layer (client release, dead-man switch on disconnect) assumes *some*
+    software path is still working. This one doesn't: if a client's PTT
+    gets stuck open while its socket stays alive (app backgrounded, gesture
+    callback missed, user walked away), this is the only thing standing
+    between that and cooking the finals unattended.
+    """
+    keyed_since: float | None = None
+    while True:
+        try:
+            if radio and radio.is_transmitting:
+                if keyed_since is None:
+                    keyed_since = time.monotonic()
+                elif time.monotonic() - keyed_since >= radio.tx_timeout_s:
+                    logger.warning(
+                        "TX watchdog: keyed for %.0fs (limit %ds) — forcing RX",
+                        time.monotonic() - keyed_since, radio.tx_timeout_s)
+                    if cat and cat.connected:
+                        try:
+                            await cat.set_ptt(False)
+                        except Exception:
+                            pass
+                    radio.update(tx_status=0)
+                    _schedule_meter_clear()
+                    if audio:
+                        await asyncio.to_thread(audio.stop_tx)
+                    await _broadcast_state()
+                    keyed_since = None
+            else:
+                keyed_since = None
+        except asyncio.CancelledError:
+            return
+        except Exception as e:
+            logger.warning("TX watchdog error: %s", e)
+        await asyncio.sleep(1.0)
+
+
 async def _audio_tx_drain_loop():
     """Periodically drain queued TX audio to the sound card output.
 
@@ -893,6 +969,7 @@ async def _execute_set_command(field: str, value, ws: WebSocket):
                 # open and start_tx's queue-clearing discards them.
                 # start_tx() is idempotent — if a stream is already active
                 # it returns immediately without clearing the queue.
+                _cancel_meter_clear()
                 await cat.set_ptt(True)
                 radio.update(tx_status=1)
                 if audio:
@@ -904,8 +981,8 @@ async def _execute_set_command(field: str, value, ws: WebSocket):
                         # than silently transmitting a dead carrier.
                         logger.error("PTT: TX audio stream failed — unkeying radio")
                         await cat.set_ptt(False)
-                        radio.update(tx_status=0, power_meter=0, alc_meter=0,
-                                     swr_meter=0, comp_meter=0, id_meter=0)
+                        radio.update(tx_status=0)
+                        _schedule_meter_clear()
                         await ws.send_text(json.dumps({
                             "type": "error",
                             "message": "TX audio device unavailable — PTT released. Try again.",
@@ -924,13 +1001,25 @@ async def _execute_set_command(field: str, value, ws: WebSocket):
                 # poll (plus the client PTT watchdog) catches a stuck keyup.
                 # The previous 3×200 ms verify loop added ~600 ms to release.
                 await cat.set_ptt(False)
-                radio.update(tx_status=0, power_meter=0, alc_meter=0,
-                             swr_meter=0, comp_meter=0, id_meter=0)
+                radio.update(tx_status=0)
+                _schedule_meter_clear()
             scheduler and scheduler.skip_next_poll("tx_status", 1.0)
+
+        elif field == "tx_timeout_s":
+            try:
+                secs = max(TX_TIMEOUT_MIN_S, min(TX_TIMEOUT_MAX_S, int(value)))
+            except (TypeError, ValueError):
+                await ws.send_text(json.dumps({
+                    "type": "error", "message": f"Invalid tx_timeout_s: {value}",
+                }))
+            else:
+                radio.update(tx_timeout_s=secs)
+                logger.info("TX watchdog timeout set to %ds", secs)
 
         elif field == "tune":
             on = value is True or str(value).lower() == "true"
             if on:
+                _cancel_meter_clear()
                 # Start low-power carrier for tuning (TX2)
                 await cat.set_tune(True)
                 radio.update(tx_status=2)
@@ -944,6 +1033,7 @@ async def _execute_set_command(field: str, value, ws: WebSocket):
                 await cat.send_priority_set_command("AC000")
                 await cat.set_tune(False)
                 radio.update(tx_status=0, tuner_status=0)
+                _schedule_meter_clear()
             scheduler and scheduler.skip_next_poll("tx_status", 1.0)
 
         elif field == "filter" or field == "filter_width":
@@ -1348,7 +1438,7 @@ async def lifespan(app: FastAPI):
     """Startup: connect to FT-710, start polling, scope, and audio.
        Shutdown: disconnect, force RX, cancel tasks."""
     global cat, scheduler, scope, audio, _scope_read_task, _scope_broadcast_task
-    global _audio_rx_task, _audio_tx_task, _opus_tx_decoder
+    global _audio_rx_task, _audio_tx_task, _tx_watchdog_task, _opus_tx_decoder
 
     # ── Startup ──
     startup_time = time.time()
@@ -1395,6 +1485,7 @@ async def lifespan(app: FastAPI):
     if _audio_ok:
         _audio_rx_task = asyncio.create_task(_audio_rx_loop(), name="audio_rx")
     _audio_tx_task = asyncio.create_task(_audio_tx_drain_loop(), name="audio_tx")
+    _tx_watchdog_task = asyncio.create_task(_tx_watchdog_loop(), name="tx_watchdog")
 
     # Start scope handler — broadcasts S-meter fallback until real data arrives
     scope = ScopeHandler()
@@ -1425,6 +1516,9 @@ async def lifespan(app: FastAPI):
         _audio_rx_task.cancel()
     if _audio_tx_task:
         _audio_tx_task.cancel()
+    if _tx_watchdog_task:
+        _tx_watchdog_task.cancel()
+    _cancel_meter_clear()
     if _opus_tx_decoder:
         try:
             _opus_tx_decoder.close()
