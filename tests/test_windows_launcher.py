@@ -27,6 +27,13 @@ class WindowsLauncherTests(unittest.TestCase):
             app_root / "vendor" / "ftdi" / "windows" / "bin" / "x64",
         )
 
+    def test_should_open_browser_defaults_true(self):
+        self.assertTrue(launcher.should_open_browser({}))
+
+    def test_should_open_browser_respects_false_values(self):
+        for value in ("false", "False", "0", "no"):
+            self.assertFalse(launcher.should_open_browser({"FT710_OPEN_BROWSER": value}))
+
 
 class _HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):

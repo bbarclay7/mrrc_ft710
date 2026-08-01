@@ -119,6 +119,10 @@ def build_command() -> list[str]:
     return [sys.executable, str(server), "--no-ssl"]
 
 
+def should_open_browser(env: dict) -> bool:
+    return env.get("FT710_OPEN_BROWSER", "true").strip().lower() not in ("false", "0", "no")
+
+
 def stop_process(proc: subprocess.Popen) -> None:
     if proc.poll() is not None:
         return
@@ -141,6 +145,8 @@ def main() -> int:
     url_host = "127.0.0.1" if host in ("::", "0.0.0.0", "") else host
     url = f"http://{url_host}:{port}"
 
+    open_browser = should_open_browser(env)
+
     print(APP_NAME)
     print(f"Config: {cfg}")
     print(f"URL:    {url}")
@@ -156,13 +162,16 @@ def main() -> int:
         creationflags=creationflags,
     )
     if wait_for_server(url, proc):
-        webbrowser.open(url)
+        if open_browser:
+            webbrowser.open(url)
     elif proc.poll() is not None:
         print("Server exited during startup — see messages above.")
         return proc.returncode or 1
     else:
-        print(f"Server did not answer within 15s; opening {url} anyway.")
-        webbrowser.open(url)
+        print(f"Server did not answer within 15s.")
+        if open_browser:
+            print(f"Opening {url} anyway.")
+            webbrowser.open(url)
     try:
         return proc.wait()
     except KeyboardInterrupt:
