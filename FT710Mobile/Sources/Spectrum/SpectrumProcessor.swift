@@ -6,9 +6,9 @@ final class SpectrumProcessor: @unchecked Sendable {
     private let binCount = 850
     private let rowHistory = 100
     private let wfDecimate = 1     // process every frame (~30 fps waterfall)
-    private let wfGain: Float = 12.0
-    private let wfBias: Float = 40
-    private let wfPctl: Float = 0.35
+    private let wfGain: Float = 22.0
+    private let wfBias: Float = 10
+    private let wfPctl: Float = 0.20
 
     // Colour LUT matching web frontend (dark blue → cyan → yellow → red)
     private static let lut: [UInt32] = {

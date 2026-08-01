@@ -53,7 +53,7 @@ struct ContentView: View {
                     VStack(spacing: 0) {
                         FFTLineView()
                             .frame(height: 66)
-                        WaterfallView()
+                        WaterfallView(tuneStep: tuneStep)
                             .frame(height: 67)
                     }
                     .frame(height: 133)
@@ -242,6 +242,13 @@ struct ContentView: View {
                                 .foregroundColor(viewModel.audioCapture.isRecording ? .red : .radioText)
                                 .frame(width: 80, height: 96).background(Color.radioSurface).cornerRadius(8)
                         }
+                        Button(action: { viewModel.runTunerAssist() }) {
+                            Image(systemName: viewModel.state.tunerAssistRunning ? "hourglass" : "dial.low")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(viewModel.state.tunerAssistRunning ? .radioMuted : .radioAccent)
+                                .frame(width: 56, height: 96).background(Color.radioSurface).cornerRadius(8)
+                        }
+                        .disabled(viewModel.state.tunerAssistRunning)
                     }.padding(.horizontal, 8).padding(.vertical, 4).background(Color.radioBg.opacity(0.97))
                 }
             }

@@ -15,6 +15,12 @@ final class WebSocketConnection: NSObject, @unchecked Sendable {
     private var isActive = false
     private var shouldReconnect = true
 
+    /// Windows launcher runs --no-ssl (plain HTTP) by default; set in Settings/Login
+    /// for a server fronted by real TLS (e.g. radio.vlsc.net).
+    static var useSecureConnection: Bool {
+        UserDefaults.standard.bool(forKey: "useSecureConnection")
+    }
+
     var onText: ((String) -> Void)?
     var onBinary: ((Data) -> Void)?
     var onConnected: (() -> Void)?
@@ -68,7 +74,7 @@ final class WebSocketConnection: NSObject, @unchecked Sendable {
 
     private func makeSession() -> URLSession {
         let config = URLSessionConfiguration.default
-        let scheme = "https"
+        let scheme = Self.useSecureConnection ? "https" : "http"
         config.httpAdditionalHeaders = [
             "Origin": "\(scheme)://\(serverHost)",
             "User-Agent": "FT710Mobile/1.0",
@@ -80,7 +86,7 @@ final class WebSocketConnection: NSObject, @unchecked Sendable {
         let sess = makeSession()
         session = sess
 
-        let scheme = "wss"
+        let scheme = Self.useSecureConnection ? "wss" : "ws"
         var urlStr = "\(scheme)://\(serverHost)\(endpoint)"
 
         if let pass = password, !pass.isEmpty {

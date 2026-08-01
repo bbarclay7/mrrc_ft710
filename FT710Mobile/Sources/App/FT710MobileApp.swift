@@ -7,6 +7,7 @@ struct FT710MobileApp: App {
     @AppStorage("serverHost") private var savedHost: String = "radio.vlsc.net:8888"
     @State private var isLoggedIn: Bool = false
     @State private var viewModel: RadioViewModel?
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -16,18 +17,28 @@ struct FT710MobileApp: App {
                     .preferredColorScheme(.dark)
                     .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
                     .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
+                    // Mobile equivalent of the web app's pagehide/beforeunload PTT
+                    // safety layers: a backgrounded app can never receive the
+                    // touch-up that would normally release PTT, so force it here.
+                    .onChange(of: scenePhase) { _, phase in
+                        if phase != .active { vm.setPTT(false) }
+                    }
             } else {
                 LoginView { host, pass in
                     savedHost = host
                     savePassword(pass, for: host)
-                    viewModel = RadioViewModel(serverHost: host, password: pass)
+                    let vm = RadioViewModel(serverHost: host, password: pass)
+                    viewModel = vm
                     isLoggedIn = true
+                    vm.powerOnAsync()
                 }
                 .preferredColorScheme(.dark)
                 .onAppear {
                     if !savedHost.isEmpty, let pass = loadPassword(for: savedHost) {
-                        viewModel = RadioViewModel(serverHost: savedHost, password: pass)
+                        let vm = RadioViewModel(serverHost: savedHost, password: pass)
+                        viewModel = vm
                         isLoggedIn = true
+                        vm.powerOnAsync()
                     }
                 }
             }
@@ -40,14 +51,23 @@ struct FT710MobileApp: App {
 
     private func savePassword(_ pass: String, for host: String) {
         guard !pass.isEmpty else { return }
-        let query: [String: Any] = [
+        // Match query for delete/add must only contain identifying attributes —
+        // kSecValueData doesn't belong here. Including it used to mean the delete
+        // could fail to find the existing item, and the follow-up add's result
+        // was never checked, so a stale password silently stuck around forever.
+        let matchQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrServer as String: host,
             kSecAttrAccount as String: keychainAccount,
-            kSecValueData as String: pass.data(using: .utf8)!,
         ]
-        SecItemDelete(query as CFDictionary)
-        SecItemAdd(query as CFDictionary, nil)
+        SecItemDelete(matchQuery as CFDictionary)
+
+        var addQuery = matchQuery
+        addQuery[kSecValueData as String] = pass.data(using: .utf8)!
+        let status = SecItemAdd(addQuery as CFDictionary, nil)
+        if status != errSecSuccess {
+            print("⚠️ Keychain save failed: \(status)")
+        }
     }
 
     private func loadPassword(for host: String) -> String? {

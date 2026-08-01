@@ -4,6 +4,8 @@ import SwiftUI
 /// Frequency scale based on scopeStartFreq and scopeSpanHz from state.
 struct WaterfallView: View {
     @EnvironmentObject var viewModel: RadioViewModel
+    /// Snap grid for tap-to-tune — same step the manual </> tuning buttons use.
+    var tuneStep: Int = 1000
 
     var body: some View {
         GeometryReader { geo in
@@ -69,8 +71,10 @@ struct WaterfallView: View {
             .background(Color(hex: "#020617"))
             .gesture(DragGesture(minimumDistance: 0).onEnded { v in
                 let fract = Double(v.location.x / w)
-                let clickedFreq = Int((leftEdge + fract * span).rounded())
-                viewModel.setFrequency(clickedFreq)
+                let rawFreq = leftEdge + fract * span
+                let step = Double(max(tuneStep, 1))
+                let snapped = Int((rawFreq / step).rounded() * step)
+                viewModel.setFrequency(snapped)
             })
         }
     }

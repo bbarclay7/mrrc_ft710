@@ -4,6 +4,7 @@ struct LoginView: View {
     let onLogin: (String, String) -> Void  // host, password
 
     @AppStorage("serverHost") private var host: String = "radio.vlsc.net:8888"
+    @AppStorage("useSecureConnection") private var useSecureConnection: Bool = false
     @State private var password: String = ""
     @State private var showPassword = false
     @State private var isConnecting = false
@@ -54,6 +55,11 @@ struct LoginView: View {
                     .padding(12)
                     .background(Color.white.opacity(0.08))
                     .cornerRadius(10)
+
+                    Toggle("Secure (HTTPS/WSS)", isOn: $useSecureConnection)
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .tint(.orange)
                 }
 
                 // Password field

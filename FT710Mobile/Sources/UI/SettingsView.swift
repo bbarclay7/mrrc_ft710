@@ -6,6 +6,7 @@ struct SettingsView: View {
     @EnvironmentObject var viewModel: RadioViewModel
     @Environment(\.dismiss) private var dismiss
     @AppStorage("serverHost") private var serverHost: String = "radio.vlsc.net:8888"
+    @AppStorage("useSecureConnection") private var useSecureConnection: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -18,6 +19,8 @@ struct SettingsView: View {
                             TextField("Host:Port", text: $serverHost)
                                 .font(.subheadline.monospaced()).autocapitalization(.none).disableAutocorrection(true)
                         }
+                        Toggle("Secure (HTTPS/WSS)", isOn: $useSecureConnection)
+                            .font(.subheadline).tint(.radioAccent)
                         Button("Reconnect") {
                             dismiss()
                             // Wait for sheet dismiss animation to finish before reconnecting
@@ -47,6 +50,27 @@ struct SettingsView: View {
                             get: { Double(viewModel.state.rfPower) },
                             set: { viewModel.setRFPower(Int($0)) }
                         ), in: 5...100, step: 5).tint(.radioRed)
+
+                        Button(action: { viewModel.runTunerAssist() }) {
+                            Label(viewModel.state.tunerAssistRunning ? "Tuning…" : "Tuner Assist",
+                                  systemImage: "dial.low")
+                        }
+                        .disabled(viewModel.state.tunerAssistRunning)
+                        .foregroundColor(.radioAccent).buttonStyle(.bordered)
+                        Text("Drops to 10W, keys a steady carrier for 5s for an external auto-tuner, then restores power.")
+                            .font(.caption2).foregroundColor(.radioMuted)
+
+                        HStack {
+                            Text("TX Timeout").font(.subheadline)
+                            Spacer()
+                            Text("\(viewModel.state.txTimeoutS)s").font(.subheadline.monospaced()).foregroundColor(.radioAccent)
+                        }
+                        Slider(value: Binding(
+                            get: { Double(viewModel.state.txTimeoutS) },
+                            set: { viewModel.setTXTimeout(Int($0)) }
+                        ), in: 30...1800, step: 30).tint(.radioRed)
+                        Text("Server forces RX if keyed this long, even if the app is stuck or backgrounded.")
+                            .font(.caption2).foregroundColor(.radioMuted)
                     }
 
                     // AGC

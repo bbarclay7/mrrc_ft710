@@ -38,7 +38,7 @@ struct DSPPanelContent: View {
                     HStack(spacing: 0) {
                         ForEach(["关", "快", "中", "慢"].indices, id: \.self) { i in
                             Button(action: { viewModel.setAGC(i) }) {
-                                Text(["关", "快", "中", "慢"][i])
+                                Text(LocalizedStringKey(["关", "快", "中", "慢"][i]))
                                     .font(.subheadline.weight(.medium))
                                     .foregroundColor(viewModel.state.agc == i ? .black : .radioAccent)
                                     .frame(maxWidth: .infinity)
@@ -92,7 +92,7 @@ struct DSPPanelContent: View {
                         ForEach(["关", "开", "调谐"].indices, id: \.self) { i in
                             let vals = [0, 1, 2]
                             Button(action: { viewModel.setTuner(vals[i]) }) {
-                                Text(["关", "开", "调谐"][i])
+                                Text(LocalizedStringKey(["关", "开", "调谐"][i]))
                                     .font(.subheadline.weight(.medium))
                                     .foregroundColor(viewModel.state.tunerStatus == vals[i] ? .black : .radioAccent)
                                     .frame(maxWidth: .infinity)
@@ -107,7 +107,7 @@ struct DSPPanelContent: View {
             }
     }
 
-    private func dspCard<Content: View>(title: String, icon: String,
+    private func dspCard<Content: View>(title: LocalizedStringKey, icon: String,
                                         @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Label(title, systemImage: icon)
@@ -123,10 +123,10 @@ struct DSPPanelContent: View {
 }
 
 struct ToggleRow: View {
-    let label: String
+    let label: LocalizedStringKey
     @Binding var isOn: Bool
 
-    init(_ label: String, isOn: Binding<Bool>) {
+    init(_ label: LocalizedStringKey, isOn: Binding<Bool>) {
         self.label = label
         self._isOn = isOn
     }

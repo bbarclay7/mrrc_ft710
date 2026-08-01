@@ -44,6 +44,8 @@ final class RadioState: ObservableObject {
     @Published var split: Bool = false
     @Published var vox: Bool = false
     @Published var breakIn: Bool = false
+    @Published var txTimeoutS: Int = 300     // server-side PTT watchdog ceiling (seconds)
+    @Published var tunerAssistRunning: Bool = false
 
     // MARK: - Scope
     @Published var scopeOn: Bool = true
@@ -233,6 +235,7 @@ final class RadioState: ObservableObject {
         if let v = data["squelch"] as? Int { squelch = v }
         if let v = data["mic_gain"] as? Int { micGain = v }
         if let v = data["split"] as? Bool { split = v }
+        if let v = data["tx_timeout_s"] as? Int { txTimeoutS = v }
         if let v = data["scope_span"] as? Int { scopeSpan = v }
         if let v = data["scope_mode"] as? Int { scopeMode = v }
         if let v = data["scope_start_freq"] as? Int { scopeStartFreq = v }

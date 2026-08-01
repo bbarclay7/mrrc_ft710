@@ -14,6 +14,7 @@ final class AudioCaptureManager: NSObject, ObservableObject, @unchecked Sendable
 
     private var accumulator: [Float] = []
     private var enginePrimed = false
+    private var currentInputRate: Double = 48000
 
     // ── Opus encoder ──────────────────────────────────────────
     private let opusEncoder = OpusEncoder()
@@ -57,6 +58,8 @@ final class AudioCaptureManager: NSObject, ObservableObject, @unchecked Sendable
     func shutdown() {
         isCapturing = false
         guard enginePrimed else { return }
+        NotificationCenter.default.removeObserver(self, name: .AVAudioEngineConfigurationChange, object: engine)
+        NotificationCenter.default.removeObserver(self, name: .audioSessionNeedsEngineRestart, object: nil)
         engine.stop()
         engine.inputNode.removeTap(onBus: 0)
         enginePrimed = false
@@ -69,16 +72,26 @@ final class AudioCaptureManager: NSObject, ObservableObject, @unchecked Sendable
     private func primeEngine() {
         let inputNode = engine.inputNode
         let inputFormat = inputNode.outputFormat(forBus: 0)
-        let nativeRate = inputFormat.sampleRate
+        currentInputRate = inputFormat.sampleRate
 
-        print("🎤 TX engine priming @ native \(Int(nativeRate))Hz  frame=\(frameSize)samples")
+        print("🎤 TX engine priming @ native \(Int(currentInputRate))Hz  frame=\(frameSize)samples")
 
-        // Tap once, keep forever — guarded by isCapturing in closure
+        // Tap once, keep forever — guarded by isCapturing in closure. Reads
+        // currentInputRate live (not captured) so a route change that alters
+        // the mic's native rate doesn't leave this resampling from a stale value.
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
             guard let self = self, self.isCapturing else { return }
-            self.processBuffer(buffer, nativeRate: nativeRate)
+            self.processBuffer(buffer, nativeRate: self.currentInputRate)
         }
 
+        NotificationCenter.default.addObserver(self, selector: #selector(handleConfigChange),
+                                                name: .AVAudioEngineConfigurationChange, object: engine)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleConfigChange),
+                                                name: .audioSessionNeedsEngineRestart, object: nil)
+        startEngine()
+    }
+
+    private func startEngine() {
         do {
             try engine.start()
             enginePrimed = true
@@ -89,6 +102,15 @@ final class AudioCaptureManager: NSObject, ObservableObject, @unchecked Sendable
             NotificationCenter.default.post(name: .audioError, object: nil,
                                             userInfo: ["error": captureError ?? "Unknown"])
         }
+    }
+
+    /// The input route changed (e.g. built-in mic ↔ Bluetooth/hearing aid) — iOS
+    /// stops the engine on the hardware switch and expects the app to restart it.
+    @objc private func handleConfigChange(_ notification: Notification) {
+        guard enginePrimed else { return }
+        engine.stop()
+        currentInputRate = engine.inputNode.outputFormat(forBus: 0).sampleRate
+        startEngine()
     }
 
     private func processBuffer(_ buffer: AVAudioPCMBuffer, nativeRate: Double) {

@@ -83,11 +83,30 @@ final class AudioPlaybackManager: NSObject, ObservableObject, @unchecked Sendabl
         engine.attach(playerNode)
         engine.connect(playerNode, to: engine.mainMixerNode, format: playbackFormat)
         applyVolume()
+        startEngine()
 
+        NotificationCenter.default.addObserver(self, selector: #selector(handleConfigChange),
+                                                name: .AVAudioEngineConfigurationChange, object: engine)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleConfigChange),
+                                                name: .audioSessionNeedsEngineRestart, object: nil)
+        print("🔊 Audio playback started @ \(sourceSampleRate) Hz")
+    }
+
+    func stop() {
+        guard isStarted else { return }
+        isStarted = false
+        NotificationCenter.default.removeObserver(self, name: .AVAudioEngineConfigurationChange, object: engine)
+        NotificationCenter.default.removeObserver(self, name: .audioSessionNeedsEngineRestart, object: nil)
+        playerNode.stop()
+        engine.stop()
+        engine.reset()
+        print("🔇 Audio playback stopped  frames=\(frameCount) opusDrops=\(opusDropCount)")
+    }
+
+    private func startEngine() {
         do {
             try engine.start()
             playerNode.play()
-            print("🔊 Audio playback started @ \(sourceSampleRate) Hz")
         } catch {
             audioError = "Engine start: \(error.localizedDescription)"
             print("⚠️ \(audioError!)")
@@ -95,13 +114,16 @@ final class AudioPlaybackManager: NSObject, ObservableObject, @unchecked Sendabl
         }
     }
 
-    func stop() {
+    /// The output route changed (e.g. speaker ↔ hearing aid/Bluetooth) — iOS stops
+    /// the engine on the hardware switch and expects the app to restart it.
+    @objc private func handleConfigChange(_ notification: Notification) {
         guard isStarted else { return }
-        isStarted = false
-        playerNode.stop()
-        engine.stop()
-        engine.reset()
-        print("🔇 Audio playback stopped  frames=\(frameCount) opusDrops=\(opusDropCount)")
+        ioQueue.async { [weak self] in
+            guard let self = self else { return }
+            self.playerNode.stop()
+            self.engine.stop()
+            self.startEngine()
+        }
     }
 
     // MARK: - Enqueue PCM data

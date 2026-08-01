@@ -30,6 +30,13 @@ struct PTTButtonView: View {
                 } onPressingChanged: { pressing in
                     viewModel.setPTT(pressing)
                 }
+                // Escape hatch: onPressingChanged can miss the release edge if the
+                // gesture is interrupted (scroll steals the touch, system alert, etc),
+                // leaving TX stuck on with no way to clear it. A plain tap while lit
+                // forces PTT off regardless of gesture state.
+                .onTapGesture {
+                    if viewModel.state.txStatus == 1 { viewModel.setPTT(false) }
+                }
         }
         .padding(.bottom, 80) // room for tab bar
     }

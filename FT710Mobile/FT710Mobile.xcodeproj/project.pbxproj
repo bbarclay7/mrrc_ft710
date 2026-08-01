@@ -12,10 +12,12 @@
 		143A6B51219A6441207E4E3C /* FT710MobileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DD67DEBFDB29969EAA9B3F1 /* FT710MobileApp.swift */; };
 		15597B60373BCED1D29C64EA /* ModeSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32918148C5CBA08CB773375B /* ModeSelectorView.swift */; };
 		19662EC4015D00FAE9325003 /* AudioCaptureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C157EAE8C8690EF73D0880A /* AudioCaptureManager.swift */; };
+		220BF3044C511F1CE34A3106 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 570A564FC5262AFD441201A1 /* Localizable.xcstrings */; };
 		2424B368C36976981FC6A9F3 /* FFTLineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0442B8F002C443CF467092C9 /* FFTLineView.swift */; };
 		2B271D21C0EA52DEE9081A1D /* VFOButtons.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA661AE6EF4CA39417357B46 /* VFOButtons.swift */; };
 		2F3801A2B935E53821F2F8B5 /* PTTButtonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC324FD8D979748BADC1C40B /* PTTButtonView.swift */; };
 		2FB0F597540EA56D90C06C89 /* WaterfallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCF414FDEC6980A57582ACBD /* WaterfallView.swift */; };
+		3244F72B1772787E8A6F75B0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 64CCC233626EE1943F7A2A9B /* Assets.xcassets */; };
 		353ABF0B86F00182614C23F0 /* MainRXView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B213691E8629DDB947FFC82C /* MainRXView.swift */; };
 		40B0A078D2B2E0EF4DA20AE5 /* MemoryChannelsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF987F7D69693580D861684F /* MemoryChannelsManager.swift */; };
 		5329F94F27C447A715A7CD11 /* MemoryChannelsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1966D9EFC41E35228B8B7C83 /* MemoryChannelsView.swift */; };
@@ -68,15 +70,17 @@
 		43A4E12018D21FA6DA958452 /* libopus.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libopus.a; sourceTree = "<group>"; };
 		47EC6B2838249B27C3C44216 /* opus.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = opus.h; sourceTree = "<group>"; };
 		4C157EAE8C8690EF73D0880A /* AudioCaptureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCaptureManager.swift; sourceTree = "<group>"; };
+		570A564FC5262AFD441201A1 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		571C8D0AF256B0A4ECC8933B /* SMeterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMeterView.swift; sourceTree = "<group>"; };
 		599667BB247E4B195330A60F /* WebSocketConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketConnection.swift; sourceTree = "<group>"; };
+		64CCC233626EE1943F7A2A9B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		67370F6B2FECFCCDEADEC3CD /* opus.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = opus.h; sourceTree = "<group>"; };
 		679A21D971327DED4B3700A0 /* MemoryChannelsGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryChannelsGrid.swift; sourceTree = "<group>"; };
 		75A3B8FD0CC31411814FB37E /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		7749903EC42A6EF6AA18E574 /* BandSelectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandSelectorView.swift; sourceTree = "<group>"; };
 		77D0287AA65811A1995AA8CB /* HeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeaderView.swift; sourceTree = "<group>"; };
 		79F849B007EFCA1C1B25D92F /* RadioState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioState.swift; sourceTree = "<group>"; };
-		7EDFB07C9535CB0D110B9863 /* FT710Mobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FT710Mobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7EDFB07C9535CB0D110B9863 /* FT710Mobile.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FT710Mobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8BE7D45C1A9D7E4DA1F012B9 /* QuickControlsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickControlsRow.swift; sourceTree = "<group>"; };
 		902B42102F8B88B3287DC547 /* MeterBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeterBarView.swift; sourceTree = "<group>"; };
 		92BE87E2DF877D617B8867B3 /* opus_defines.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = opus_defines.h; sourceTree = "<group>"; };
@@ -231,9 +235,19 @@
 			path = Model;
 			sourceTree = "<group>";
 		};
+		CD2670B8652B35BD6B9CCCF1 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				64CCC233626EE1943F7A2A9B /* Assets.xcassets */,
+				570A564FC5262AFD441201A1 /* Localizable.xcstrings */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		DAC253A0CA852622467A97D6 = {
 			isa = PBXGroup;
 			children = (
+				CD2670B8652B35BD6B9CCCF1 /* Resources */,
 				8BF512FC5B2488D852CD90B0 /* Sources */,
 				9165CD5CA971B9BAC294E28E /* Products */,
 			);
@@ -302,6 +316,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					11D3029027139DF36CFFB79A = {
+						DevelopmentTeam = VQ89MM7935;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -330,6 +345,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3244F72B1772787E8A6F75B0 /* Assets.xcassets in Resources */,
+				220BF3044C511F1CE34A3106 /* Localizable.xcstrings in Resources */,
 				10B0537242FDBAC530D00D32 /* libopus.a in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -392,7 +409,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 5R985TLXG2;
+				DEVELOPMENT_TEAM = VQ89MM7935;
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/Sources/Audio/opus-ios/include";
 				INFOPLIST_FILE = Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -480,7 +497,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 5R985TLXG2;
+				DEVELOPMENT_TEAM = VQ89MM7935;
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/Sources/Audio/opus-ios/include";
 				INFOPLIST_FILE = Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
