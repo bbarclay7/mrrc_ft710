@@ -65,9 +65,6 @@ struct MainRXView: View {
                         .font(.caption.weight(.bold)).foregroundColor(.radioAccent).frame(width: 24, height: 24)
                 }.padding(.horizontal, 12)
 
-                // ── Memory channels grid ──────────────────
-                MemoryChannelsView()
-
                 Spacer(minLength: 100)
             }
         }.background(Color.radioBg)

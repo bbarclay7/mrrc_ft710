@@ -106,10 +106,24 @@ final class AudioCaptureManager: NSObject, ObservableObject, @unchecked Sendable
 
     /// The input route changed (e.g. built-in mic ↔ Bluetooth/hearing aid) — iOS
     /// stops the engine on the hardware switch and expects the app to restart it.
+    ///
+    /// Also removes and reinstalls the tap against the input's CURRENT format,
+    /// not just restarting the engine: the tap was installed once at prime
+    /// time with whatever format the hardware had then, and a route/session
+    /// change (e.g. a different accessory, or an audio-session mode change)
+    /// can change the input's native channel count. Restarting the engine
+    /// alone leaves the old tap listening in the old format, which crashes
+    /// the app on the very next buffer with a channel-count mismatch.
     @objc private func handleConfigChange(_ notification: Notification) {
         guard enginePrimed else { return }
         engine.stop()
-        currentInputRate = engine.inputNode.outputFormat(forBus: 0).sampleRate
+        engine.inputNode.removeTap(onBus: 0)
+        let inputFormat = engine.inputNode.outputFormat(forBus: 0)
+        currentInputRate = inputFormat.sampleRate
+        engine.inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
+            guard let self = self, self.isCapturing else { return }
+            self.processBuffer(buffer, nativeRate: self.currentInputRate)
+        }
         startEngine()
     }
 

@@ -34,15 +34,22 @@ final class AudioPlaybackManager: NSObject, ObservableObject, @unchecked Sendabl
 
     /// 10× boost matches web frontend AUDIO_GAIN_BOOST to compensate
     /// for quiet FT-710 USB audio.
+    ///
+    /// This used to be applied via `playerNode.volume = appVolume *
+    /// audioGainBoost` (up to 10.0), which did nothing above unity:
+    /// AVAudioMixing.volume is documented as 0.0-1.0, with 1.0 meaning "no
+    /// attenuation" — it can only quiet audio down, never amplify it past
+    /// the source level. Any value above 1.0 is silently clamped, so the
+    /// intended boost never applied and the slider's effective range was
+    /// really just 0.0-0.1 (everything past that hit the same clamped max),
+    /// which is exactly why turning it all the way up sounded no louder.
+    /// The gain is now applied directly to the PCM samples in processPCM()
+    /// instead, where multiplying past unity actually works.
     private let audioGainBoost: Float = 10.0
     private let audioGainMax: Float = 10.0
 
     private func applyVolume() {
-        if isMuted {
-            playerNode.volume = 0
-        } else {
-            playerNode.volume = min(audioGainMax, appVolume * audioGainBoost)
-        }
+        playerNode.volume = isMuted ? 0 : 1.0
     }
 
     // ── Recording ─────────────────────────────────────────────
@@ -154,13 +161,18 @@ final class AudioPlaybackManager: NSObject, ObservableObject, @unchecked Sendabl
         let sampleCount = pcmBytes.count / 2
         guard sampleCount > 0 else { return }
 
-        // ── vDSP-accelerated Int16 LE → Float32 ───────────────
+        // ── vDSP-accelerated Int16 LE → Float32, with gain applied ────
+        // Combines the Int16→[-1,1] normalization with the app volume/boost
+        // into one scale factor, then hard-clips to [-1,1] so a loud signal
+        // at high boost can't wrap around instead of just clipping cleanly.
         var samples = [Float](repeating: 0, count: sampleCount)
         pcmBytes.withUnsafeBytes { raw in
             let base = raw.baseAddress!.assumingMemoryBound(to: Int16.self)
-            var scale = Float(1.0 / 32768.0)
+            var scale = (1.0 / 32768.0) * min(audioGainMax, appVolume * audioGainBoost)
             vDSP_vflt16(base, 1, &samples, 1, vDSP_Length(sampleCount))
             vDSP_vsmul(samples, 1, &scale, &samples, 1, vDSP_Length(sampleCount))
+            var lo: Float = -1.0, hi: Float = 1.0
+            vDSP_vclip(samples, 1, &lo, &hi, &samples, 1, vDSP_Length(sampleCount))
         }
 
         // Recording

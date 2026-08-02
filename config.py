@@ -290,4 +290,7 @@ PTT_SAFETY_TIMEOUT = 2.0        # Seconds to force TX0; after WebSocket disconne
 PTT_VERIFY_DELAY = 0.2          # Delay before verifying TX state change
 
 # ── Memory Channels ──────────────────────────────────────────────────
-MEM_CHANNEL_COUNT = 6
+# App-level bookmark slots (freq/mode/filter saved to mem_channels.json on
+# this server) — not tied to the FT-710's own separate internal memory
+# system, so this is a free software choice, not a hardware limit.
+MEM_CHANNEL_COUNT = 12

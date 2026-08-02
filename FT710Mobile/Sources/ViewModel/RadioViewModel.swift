@@ -12,6 +12,14 @@ final class RadioViewModel: ObservableObject {
     let spectrumProc = SpectrumProcessor()
     let memChannels = MemoryChannelsManager()
     private var cancellables = Set<AnyCancellable>()
+
+    /// Set by the app entry point. Auth failing used to leave the user
+    /// stuck: isLoggedIn is already true by the time this async login
+    /// completes (so ContentView is already showing), and a bad stored
+    /// password would just keep auto-failing on every future launch with no
+    /// way back to LoginView to correct it. This lets the app level react —
+    /// clear the bad stored password and drop back to the login screen.
+    var onAuthFailure: (() -> Void)?
     
     // Error handling state
     @Published var showErrorAlert = false
@@ -161,6 +169,7 @@ final class RadioViewModel: ObservableObject {
                 } else {
                     self.state.connectionError = String(localized: "认证失败，请检查密码")
                     self.state.powerOn = false  // Reset power state on auth failure
+                    self.onAuthFailure?()
                 }
             }
             Task.detached { [weak self] in
@@ -229,15 +238,49 @@ final class RadioViewModel: ObservableObject {
     }
 
     /// Recall a memory channel by index (0-9).
+    ///
+    /// Sends the server's atomic `memRecall` message instead of three plain
+    /// `set` commands. The FT-710's band-stack registers can shift the
+    /// actual dial frequency by hundreds of kHz purely from a mode change
+    /// (the same quirk Tuner Assist hit switching to FM/RTTY) — plain
+    /// setFrequency-then-setMode landed wrong every time, and only a second,
+    /// separate recall (re-sending the same frequency) corrected it. The
+    /// server's memRecall handler already re-sends frequency after mode for
+    /// exactly this reason; using it here gets that correction in one shot.
     func recallMemory(_ index: Int) {
         guard let channel = memChannels.channels[index] else { return }
-        setFrequency(channel.freq)
-        setMode(channel.mode)
+        let msg: [String: Any] = [
+            "type": "memRecall", "freq": channel.freq, "mode": channel.mode, "vfo": state.activeVFO,
+        ]
+        if let json = try? JSONSerialization.data(withJSONObject: msg),
+           let str = String(data: json, encoding: .utf8) {
+            connection.sendControl(str)
+        }
+        setFilter(channel.filterWidth)
     }
 
-    /// Save current frequency to a memory channel.
+    /// Save current frequency, mode, and filter to a memory channel — sent
+    /// to the server via `memSaveOne` so it persists to disk
+    /// (mem_channels.json) and survives reconnects.
+    ///
+    /// Uses a single-slot patch, not the whole-array `memSave`: that one had
+    /// a real data-loss bug where saving right after launch — before the
+    /// initial fullState round-trip had populated this client's local
+    /// channel list — sent back an array that was still mostly empty,
+    /// wiping every other previously-saved slot on disk. A single-slot
+    /// patch on the server, applied against a fresh disk read, can't do
+    /// that regardless of what this client's local copy currently looks like.
     func saveMemory(_ index: Int) {
-        memChannels.storeFrequency(index, freq: state.activeFreq, mode: state.modeName)
+        memChannels.storeFrequency(index, freq: state.activeFreq, mode: state.modeName, filterWidth: state.filterWidth)
+        guard let ch = memChannels.channels[index] else { return }
+        let msg: [String: Any] = [
+            "type": "memSaveOne", "index": index,
+            "name": ch.name, "freq": ch.freq, "mode": ch.mode, "filter_width": ch.filterWidth,
+        ]
+        if let json = try? JSONSerialization.data(withJSONObject: msg),
+           let str = String(data: json, encoding: .utf8) {
+            connection.sendControl(str)
+        }
     }
 
     /// Expose memory channels for UI binding.
@@ -277,7 +320,13 @@ final class RadioViewModel: ObservableObject {
         }
     }
 
-    /// Tune (steady carrier for antenna tuning, no mic capture).
+    /// Tune (steady carrier for antenna tuning, no mic capture). Also starts
+    /// the FT-710's own internal ATU (AC003/AC000).
+    ///
+    /// Note: TX2; alone (without AC003) was confirmed by direct testing to
+    /// produce no visible transmission on this radio — there's no way to get
+    /// a bare tune carrier without also engaging the internal ATU. Tuner
+    /// Assist uses plain PTT instead for that reason (see runTunerAssist).
     func setTune(_ on: Bool) {
         sendSet("tune", on)
     }
@@ -292,24 +341,70 @@ final class RadioViewModel: ObservableObject {
 
     private static let tunerAssistPowerW = 10
     private static let tunerAssistDurationS: UInt64 = 5
+    private static let tunerAssistSettleMS: UInt64 = 300
 
-    /// Drop to low power, key a steady carrier for an external auto-tuner to
-    /// see, then restore the original power — one button instead of manually
-    /// dropping power, tuning, and dialing power back up every time.
+    /// Drop to low power, switch to RTTY, key PTT for an external auto-tuner
+    /// to see, then restore the original power, mode, and frequency.
+    ///
+    /// TX2; (CAT tune mode) turned out to be a dead end: confirmed by direct
+    /// test that it produces zero visible transmission on this radio unless
+    /// followed by AC003 (which also engages the *internal* tuner — the
+    /// opposite of what this feature is for). Switched to plain PTT (TX1;),
+    /// the one keying mechanism proven reliable all session — but SSB
+    /// (the normal operating mode) suppresses its carrier with no audio to
+    /// modulate, so keying silently in USB/LSB would produce ~0W too.
+    /// FM worked (confirmed by live test) but jumped the frequency ~600kHz
+    /// while active — almost certainly FM's carried-over repeater-offset
+    /// convention on this radio. RTTY gives the same "always a full carrier
+    /// on key-down regardless of modulation" property without that baggage.
+    ///
+    /// The FT-710 keeps a separate remembered frequency per mode (its
+    /// band-stack registers), so switching mode alone can still land on a
+    /// different frequency than where we started. Explicitly restoring
+    /// frequency (not just mode) afterward is required regardless of which
+    /// mode is used, or the radio can be left parked somewhere the operator
+    /// never chose — a real risk of drifting onto another active signal.
     func runTunerAssist() {
         guard !state.tunerAssistRunning else { return }
         state.tunerAssistRunning = true
-        let originalPower = state.rfPower
+        state.tunerAssistOriginalPower = state.rfPower
+        state.tunerAssistOriginalMode = state.modeName
+        state.tunerAssistOriginalFreq = state.activeFreq
         setRFPower(Self.tunerAssistPowerW)
-        setTune(true)
+        setMode("RTTY-L")
         Task {
+            try? await Task.sleep(nanoseconds: Self.tunerAssistSettleMS * 1_000_000)
+            self.setPTT(true)
             try? await Task.sleep(nanoseconds: Self.tunerAssistDurationS * 1_000_000_000)
             await MainActor.run {
-                self.setTune(false)
-                self.setRFPower(originalPower)
-                self.state.tunerAssistRunning = false
+                self.finishTunerAssist()
             }
         }
+    }
+
+    /// Ends Tuner Assist and restores power + mode — called both by the
+    /// normal 5s-timer completion and by the app-backgrounding recovery
+    /// path, since a background app has no other way to run the timer's
+    /// completion.
+    func finishTunerAssist() {
+        guard state.tunerAssistRunning else { return }
+        setPTT(false)
+        if let original = state.tunerAssistOriginalPower {
+            setRFPower(original)
+        }
+        if let originalMode = state.tunerAssistOriginalMode {
+            setMode(originalMode)
+        }
+        // Explicit, after mode restore: mode changes can themselves recall a
+        // different frequency (band-stack memory), so restoring mode alone
+        // isn't guaranteed to land back on the exact original frequency.
+        if let originalFreq = state.tunerAssistOriginalFreq {
+            setFrequency(originalFreq)
+        }
+        state.tunerAssistOriginalPower = nil
+        state.tunerAssistOriginalMode = nil
+        state.tunerAssistOriginalFreq = nil
+        state.tunerAssistRunning = false
     }
 
     // MARK: - Gain controls
@@ -456,7 +551,7 @@ final class RadioViewModel: ObservableObject {
                     if let fullData = json["data"] as? [String: Any] {
                         self.state.applyFullState(fullData)
                     }
-                    if let memChannels = json["memChannels"] as? [[String: Any]] {
+                    if let memChannels = json["memChannels"] as? [Any] {
                         self.memChannels.loadFromServer(memChannels)
                     }
                 case "stateUpdate":
@@ -468,7 +563,7 @@ final class RadioViewModel: ObservableObject {
                 case "error":
                     self.state.connectionError = json["message"] as? String
                 case "memChannels":
-                    if let channels = json["channels"] as? [[String: Any]] {
+                    if let channels = json["channels"] as? [Any] {
                         self.memChannels.loadFromServer(channels)
                     }
                 default:

@@ -1,7 +1,16 @@
 import SwiftUI
 
-/// FT710 waterfall — scope is centred on display centre frequency (no LO/IF offset).
-/// Frequency scale based on scopeStartFreq and scopeSpanHz from state.
+/// FT710 waterfall — scope is centred on the VFO frequency.
+/// Frequency scale based on scopeSpanHz from state.
+///
+/// The earlier "VFO is the left edge, not centre" theory (see git history)
+/// turned out to be a red herring: the radio's front-panel scope display had
+/// been manually left in FIX mode, which anchors the captured window at the
+/// dial frequency instead of centring it — a physical switch on the radio,
+/// not something the EX0402 CAT command actually controls for this data
+/// path (confirmed: toggling that command's parameter had no effect, while
+/// toggling the radio's own FIX/CENTER control fixed it immediately). With
+/// the radio correctly in CENTER mode, the VFO-centred assumption is right.
 struct WaterfallView: View {
     @EnvironmentObject var viewModel: RadioViewModel
     /// Snap grid for tap-to-tune — same step the manual </> tuning buttons use.
@@ -13,14 +22,11 @@ struct WaterfallView: View {
             let h = geo.size.height
             let span = Double(viewModel.state.scopeSpanHz)
             let vfoFreq = Double(viewModel.state.activeFreq)
-            // The server always sets CENTER mode (EX040200), so the VFO
-            // frequency *is* the scope centre.  Compute everything from
-            // the VFO alone — no dependency on scope_start_freq.
             let halfSpan = span / 2.0
             let leftEdge = vfoFreq - halfSpan
             let step = freqStep(span: span)
 
-            // VFO is always at centre in CENTER mode → half canvas width.
+            // VFO is always at centre → half canvas width.
             let vfoX = w / 2
 
             ZStack(alignment: .topLeading) {

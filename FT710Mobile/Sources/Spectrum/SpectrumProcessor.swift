@@ -2,13 +2,19 @@ import UIKit
 
 /// Processes FT-710 scope spectrum frames (1B version + 850B wf1 + 850B wf2)
 /// into a scrolling waterfall UIImage. All CPU work on background queue.
-final class SpectrumProcessor: @unchecked Sendable {
+final class SpectrumProcessor: ObservableObject, @unchecked Sendable {
     private let binCount = 850
     private let rowHistory = 100
     private let wfDecimate = 1     // process every frame (~30 fps waterfall)
     private let wfGain: Float = 22.0
     private let wfBias: Float = 10
     private let wfPctl: Float = 0.20
+
+    /// Manual sensitivity/reference-level offset (-40...+40), added on top of
+    /// the automatic floor estimate — lets the operator push noise down
+    /// further by hand when the automatic percentile isn't aggressive enough
+    /// for the current band conditions.
+    @Published var userOffset: Float = 0
 
     // Colour LUT matching web frontend (dark blue → cyan → yellow → red)
     private static let lut: [UInt32] = {
@@ -112,8 +118,9 @@ final class SpectrumProcessor: @unchecked Sendable {
         // Build pixel row with pre-allocated buffer
         let pixels = UnsafeMutablePointer<UInt32>.allocate(capacity: w)
         let lut = Self.lut
+        let offset = userOffset
         for x in 0..<w {
-            var v = wfBias + (avg[x] - floor) * wfGain
+            var v = wfBias + offset + (avg[x] - floor) * wfGain
             v = max(0, min(255, v))
             pixels[x] = lut[Int(v)]
         }

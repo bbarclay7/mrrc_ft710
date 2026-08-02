@@ -34,7 +34,6 @@ final class RadioState: ObservableObject {
     @Published var autoNotch: Bool = false
     @Published var compressor: Bool = false
     @Published var compressorLevel: Int = 50
-    @Published var nrLevel: Int = 8
     @Published var nbLevel: Int = 5
     @Published var tunerStatus: Int = 0      // 0=OFF,1=ON,2=Tuning
     @Published var powerOn: Bool = true
@@ -46,6 +45,9 @@ final class RadioState: ObservableObject {
     @Published var breakIn: Bool = false
     @Published var txTimeoutS: Int = 300     // server-side PTT watchdog ceiling (seconds)
     @Published var tunerAssistRunning: Bool = false
+    @Published var tunerAssistOriginalPower: Int? = nil
+    @Published var tunerAssistOriginalMode: String? = nil
+    @Published var tunerAssistOriginalFreq: Int? = nil
 
     // MARK: - Scope
     @Published var scopeOn: Bool = true
@@ -57,7 +59,6 @@ final class RadioState: ObservableObject {
     // MARK: - Extended DSP
     @Published var antenna: Int = 1
     @Published var agc: Int = 1              // 0=OFF,1=FAST,2=MED,3=SLOW
-    @Published var dnrLevel: Int = 0
     @Published var contourLevel: Int = 0
 
     // MARK: - Radio Info
@@ -138,6 +139,29 @@ final class RadioState: ObservableObject {
         0: "1 kHz", 1: "2 kHz", 2: "5 kHz", 3: "10 kHz", 4: "20 kHz",
         5: "50 kHz", 6: "100 kHz", 7: "200 kHz", 8: "500 kHz", 9: "1 MHz",
     ]
+
+    /// Controls the user can show on the main screen (Settings → Main Screen
+    /// toggles each on/off), instead of every knob living only in Settings.
+    enum MainScreenControl: String, CaseIterable, Identifiable {
+        // DNR and NR level are both intentionally absent: the FT-710 has no
+        // CAT command for either ("DN;" is the VFO step-down command on this
+        // radio, and "NR" is a plain on/off toggle with no level parameter —
+        // "RL" isn't a real FT-710 command at all). NR on/off already has its
+        // own toggle elsewhere; no UI is exposed for what the hardware can't do.
+        case rfPower, squelch, rfGain, scopeSpan, waterfallOffset
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .rfPower: return "Power"
+            case .squelch: return "Squelch"
+            case .rfGain: return "RF Gain"
+            case .scopeSpan: return "Span"
+            case .waterfallOffset: return "WF Offset"
+            }
+        }
+        /// Key for this control's own main-screen visibility toggle.
+        var storageKey: String { "mainScreenShow_\(rawValue)" }
+    }
 
     static let bands: [(name: String, start: Int, end: Int, defaultFreq: Int)] = [
         ("160m", 1_800_000, 2_000_000, 1_845_500),

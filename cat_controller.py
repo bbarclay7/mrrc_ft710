@@ -701,8 +701,16 @@ class CatController:
         return await self.set(f"NL0{level:02d}")
 
     async def set_nr_level(self, level: int) -> bool:
-        """Set noise reduction level (1-15)."""
-        return await self.set(f"RL{level:02d}")
+        """NR level set is NOT supported on the FT-710.
+
+        The FT-710 CAT reference documents "NR" as a plain on/off toggle
+        (NR0/NR1, consistent with NB/BC/NA/BI/VX) with no level parameter.
+        "RL" is not a documented FT-710 command at all — it was copied from
+        a different Yaesu model's CAT reference without verification.
+        This method is a no-op kept only for API compatibility.
+        """
+        logger.warning("set_nr_level ignored: no NR-level command exists on FT-710")
+        return False
 
     async def set_compressor_level(self, level: int) -> bool:
         """Set compressor level (1-100)."""

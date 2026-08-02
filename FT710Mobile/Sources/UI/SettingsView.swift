@@ -7,6 +7,11 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("serverHost") private var serverHost: String = "radio.vlsc.net:8888"
     @AppStorage("useSecureConnection") private var useSecureConnection: Bool = false
+    @AppStorage("mainScreenShow_rfPower") private var showRFPower = true
+    @AppStorage("mainScreenShow_squelch") private var showSquelch = true
+    @AppStorage("mainScreenShow_rfGain") private var showRFGain = true
+    @AppStorage("mainScreenShow_scopeSpan") private var showScopeSpan = true
+    @AppStorage("mainScreenShow_waterfallOffset") private var showWaterfallOffset = false
 
     var body: some View {
         NavigationStack {
@@ -28,6 +33,17 @@ struct SettingsView: View {
                                 viewModel.reconnect()
                             }
                         }.foregroundColor(.radioAccent).buttonStyle(.borderedProminent)
+                    }
+
+                    // Main Screen — each control's own visibility toggle, so
+                    // there's no slot-assignment concept and no way to end up
+                    // with the same control showing twice.
+                    SettingsCard(title: "Main Screen", icon: "slider.horizontal.3") {
+                        Toggle("Power", isOn: $showRFPower).font(.subheadline).tint(.radioAccent)
+                        Toggle("Squelch", isOn: $showSquelch).font(.subheadline).tint(.radioAccent)
+                        Toggle("RF Gain", isOn: $showRFGain).font(.subheadline).tint(.radioAccent)
+                        Toggle("Span", isOn: $showScopeSpan).font(.subheadline).tint(.radioAccent)
+                        Toggle("Waterfall Offset", isOn: $showWaterfallOffset).font(.subheadline).tint(.radioAccent)
                     }
 
                     // Connection Status

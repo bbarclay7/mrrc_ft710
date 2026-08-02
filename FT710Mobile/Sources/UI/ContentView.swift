@@ -5,6 +5,8 @@ struct ContentView: View {
     @EnvironmentObject var viewModel: RadioViewModel
     @State private var selectedTab = 0
     @State private var tuneStep: Int = 1000  // Hz, matches web default
+    @State private var storeArmed = false
+    @State private var memPage = 0
 
     var body: some View {
         ZStack {
@@ -67,6 +69,9 @@ struct ContentView: View {
 
                     // ── Quick controls row (Mode·Band·Filter·ATT·IPO) ──
                     QuickControlsRow()
+
+                    // ── User-configurable slider slots (Settings → Main Screen) ──
+                    MainScreenSlotsView()
 
                     // ── DSP toggles ──
                     HStack(spacing: 4) {
@@ -132,15 +137,12 @@ struct ContentView: View {
                                 .font(.system(size: 14, weight: .bold)).foregroundColor(.radioAccent)
                                 .frame(width: 44, height: 38).background(Color.radioSurface).cornerRadius(4)
                         }
-                        // Step selector — cycles through preset step sizes (matches web)
-                        Button(action: {
-                            let steps = [10, 100, 1000, 5000, 10000, 25000]
-                            if let idx = steps.firstIndex(of: tuneStep) {
-                                tuneStep = steps[(idx + 1) % steps.count]
-                            } else {
-                                tuneStep = 1000
+                        // Step selector — tap to pick a step size directly
+                        Menu {
+                            ForEach([10, 100, 250, 1000, 5000, 10000, 25000, 50000, 100000, 1000000], id: \.self) { step in
+                                Button(stepLabel(step)) { tuneStep = step }
                             }
-                        }) {
+                        } label: {
                             Text(stepLabel(tuneStep))
                                 .font(.system(size: 17, weight: .bold, design: .monospaced))
                                 .foregroundColor(.radioAccent)
@@ -193,17 +195,67 @@ struct ContentView: View {
                     }.padding(.horizontal, 6)
 
                     // ── Memory channels grid ──
+                    // Tap an M-button to recall. To store, tap STO first
+                    // (arms store-mode like a calculator's memory key), then
+                    // tap the M-button to save the current VFO/mode/filter
+                    // into it. A long-press-to-store design was tried first
+                    // and dropped: three different gesture approaches all
+                    // still let the plain tap fire on finger-up regardless
+                    // of hold duration. A real Button + a separate
+                    // arm/disarm step has no such ambiguity.
+                    //
+                    // 12 slots total, paged 6 at a time (M1-6, M7-12, ...) —
+                    // < and > page between them. MEM_CHANNEL_COUNT is a pure
+                    // software limit (an array size in config.py), not a
+                    // radio hardware constraint, so this can grow further
+                    // just by bumping that constant and channelCount below.
+                    let pageCount = (MemoryChannelsManager.channelCount + 5) / 6
+                    HStack(spacing: 6) {
+                        Text("MEMORY").font(.system(size: 9, weight: .bold)).foregroundColor(.radioMuted)
+                        if pageCount > 1 {
+                            Button(action: { memPage = max(0, memPage - 1) }) {
+                                Image(systemName: "chevron.left").font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(memPage == 0 ? .radioMuted.opacity(0.3) : .radioAccent)
+                            }.disabled(memPage == 0)
+                            Text("M\(memPage*6+1)-\(min(memPage*6+6, MemoryChannelsManager.channelCount))")
+                                .font(.system(size: 9, weight: .bold)).foregroundColor(.radioMuted)
+                            Button(action: { memPage = min(pageCount - 1, memPage + 1) }) {
+                                Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(memPage == pageCount - 1 ? .radioMuted.opacity(0.3) : .radioAccent)
+                            }.disabled(memPage == pageCount - 1)
+                        }
+                        Spacer()
+                        Button(action: { storeArmed.toggle() }) {
+                            Text("STO")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(storeArmed ? .black : .radioAccent)
+                                .padding(.horizontal, 10).padding(.vertical, 3)
+                                .background(storeArmed ? Color.radioAccent : Color.radioSurface)
+                                .cornerRadius(4)
+                        }
+                    }.padding(.horizontal, 6)
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 4) {
-                        ForEach(0..<6, id: \.self) { index in
-                            Button(action: { viewModel.recallMemory(index) }) {
+                        ForEach(0..<6, id: \.self) { slot in
+                            let index = memPage * 6 + slot
+                            Button(action: {
+                                guard index < MemoryChannelsManager.channelCount else { return }
+                                if storeArmed {
+                                    viewModel.saveMemory(index)
+                                    storeArmed = false
+                                } else {
+                                    viewModel.recallMemory(index)
+                                }
+                            }) {
                                 VStack(spacing: 2) {
                                     Text("M\(index + 1)").font(.system(size: 11, weight: .bold)).foregroundColor(.radioAccent)
                                     if let channel = viewModel.memoryChannels[index] {
                                         Text(channel.freqDisplay).font(.system(size: 10, design: .monospaced)).foregroundColor(Color.radioText)
                                     }
                                 }.frame(maxWidth: .infinity).frame(height: 40)
-                                    .background(Color.radioSurface).cornerRadius(4)
+                                    .background(storeArmed ? Color.radioAccent.opacity(0.25) : Color.radioSurface).cornerRadius(4)
                             }
+                            .opacity(index < MemoryChannelsManager.channelCount ? 1 : 0)
+                            .disabled(index >= MemoryChannelsManager.channelCount)
                         }
                     }.padding(.horizontal, 6)
 
@@ -261,11 +313,12 @@ struct ContentView: View {
         }
     }
 
-    /// Format step size label matching web: 10→"10Hz", 100→"100Hz", 1000→"1kHz", etc.
+    /// Format step size label: 10→"10Hz", 1000→"1kHz", 1000000→"1MHz", etc.
     private func stepLabel(_ hz: Int) -> String {
-        if hz >= 1000 {
-            let khz = hz / 1000
-            return "\(khz)kHz"
+        if hz >= 1_000_000 {
+            return "\(hz / 1_000_000)MHz"
+        } else if hz >= 1000 {
+            return "\(hz / 1000)kHz"
         }
         return "\(hz)Hz"
     }

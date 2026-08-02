@@ -280,12 +280,18 @@ async def _on_scope_frame(_scope: ScopeHandler):
         # of truth for these fields — scope data can lag behind user
         # commands and would fight the poll for control, causing the
         # displayed frequency to drift or "adjust itself".
-        if _scope.scope_span >= 0:
-            changes["scope_span"] = _scope.scope_span
-        if _scope.scope_mode >= 0:
-            changes["scope_mode"] = _scope.scope_mode
-        if _scope.scope_start_freq >= 0:
-            changes["scope_start_freq"] = _scope.scope_start_freq
+        #
+        # scope_mode / scope_span / scope_start_freq are ALSO deliberately
+        # not taken from the frame metadata anymore — confirmed by live
+        # logging that these fields don't track reality on this radio at
+        # all (scope_start_freq read a frozen 15,000,000 across 50kHz of
+        # retuning; scope_span read 131, not a valid 0-9 span index). The
+        # byte offsets parsed in scope_frame.py were reverse-engineered
+        # from wfview for a different Yaesu model and were never verified
+        # against the FT-710's actual frame layout for these fields —
+        # only vfoa_freq (a different offset) has been confirmed accurate.
+        # Blindly forwarding scope_span here was clobbering the correct,
+        # CAT-commanded value the UI/client already track with garbage.
         if changes:
             radio.update(**changes)
             await _broadcast_state()
@@ -896,6 +902,27 @@ async def _handle_ws_message(ws: WebSocket, msg_str: str):
         _save_mem_channels(channels)
         await _broadcast_mem_channels()
 
+    elif msg_type == "memSaveOne":
+        # Patches a single slot against the on-disk array instead of
+        # trusting the client's full in-memory copy to be complete and
+        # current. memSave (whole-array replace) had a real data-loss bug:
+        # if a client's local channel list hadn't finished syncing from the
+        # server yet (e.g. saved right after launch, before the initial
+        # fullState round-trip completed), sending that incomplete array
+        # back wiped out every other slot on disk. A single-slot patch can't
+        # do that regardless of what state the client thinks it's in.
+        index = msg.get("index", -1)
+        if 0 <= index < MEM_CHANNEL_COUNT:
+            channels = _load_mem_channels()
+            channels[index] = {
+                "name": msg.get("name"),
+                "freq": msg.get("freq"),
+                "mode": msg.get("mode"),
+                "filter_width": msg.get("filter_width"),
+            }
+            _save_mem_channels(channels)
+            await _broadcast_mem_channels()
+
     elif msg_type == "memDelete":
         index = msg.get("index", -1)
         if 0 <= index < MEM_CHANNEL_COUNT:
@@ -1036,6 +1063,13 @@ async def _execute_set_command(field: str, value, ws: WebSocket):
                 _schedule_meter_clear()
             scheduler and scheduler.skip_next_poll("tx_status", 1.0)
 
+        # Note: a "tune_carrier" field (bare TX2; with no AC003/AC000, for an
+        # external auto-tuner) used to live here. Removed — confirmed by
+        # direct testing that TX2; alone produces no visible transmission on
+        # this radio at all; AC003 is apparently required to get it to key.
+        # Tuner Assist now uses plain PTT (mode forced to FM first, since SSB
+        # needs modulation to produce any carrier) instead.
+
         elif field == "filter" or field == "filter_width":
             idx = int(value)
             logger.info("Filter set command: index=%d", idx)
@@ -1166,9 +1200,13 @@ async def _execute_set_command(field: str, value, ws: WebSocket):
             radio.update(nb_level=v)
 
         elif field == "nr_level":
+            # set_nr_level() is a documented no-op — the FT-710 has no CAT
+            # command for NR level (see cat_controller.py). Not updating
+            # radio state on failure so the UI never shows a value the
+            # radio never actually applied.
             v = max(1, min(15, int(value)))
-            await cat.set_nr_level(v)
-            radio.update(nr_level=v)
+            if await cat.set_nr_level(v):
+                radio.update(nr_level=v)
 
         elif field == "comp_level" or field == "compressor_level":
             v = max(1, min(100, int(value)))
@@ -1249,10 +1287,14 @@ async def _execute_set_command(field: str, value, ws: WebSocket):
                 scheduler and scheduler.skip_next_poll("agc", 3.0)
 
         elif field == "dnr" or field == "dnr_level":
+            # set_dnr() is a documented no-op — "DN;" is the VFO step-down
+            # command on the FT-710, not DNR (see cat_controller.py). Not
+            # updating radio state on failure so the UI never shows a value
+            # the radio never actually applied.
             v = max(0, min(15, int(value)))
-            await cat.set_dnr(v)
-            radio.update(dnr_level=v)
-            scheduler and scheduler.skip_next_poll("dnr_level", 3.0)
+            if await cat.set_dnr(v):
+                radio.update(dnr_level=v)
+                scheduler and scheduler.skip_next_poll("dnr_level", 3.0)
 
         elif field == "contour" or field == "contour_level":
             v = max(0, min(255, int(value)))
@@ -1399,8 +1441,13 @@ async def _init_scope_cat():
         # Enable scope data output on FT4222 SPI
         # EX = extended command prefix
         "EX040101",
-        # Set scope to CENTER mode (not FIX mode)
-        "EX040200",
+        # Set scope to CENTER mode (not FIX mode). The earlier "EX040200"
+        # here was a guess and the wrong command family entirely — confirmed
+        # against FT-710_CAT_Knowledge_Base.md: scope display mode is
+        # SS06xx (P2=6 MODE, P3=0 for "3DSS CENTER" ... A for "W/F FIX
+        # NORMAL"), not an EX-menu command. That's why flipping EX0402's
+        # parameter earlier did nothing — it just wasn't the real command.
+        "SS0600",
     ]
     for cmd in scope_cmds:
         try:

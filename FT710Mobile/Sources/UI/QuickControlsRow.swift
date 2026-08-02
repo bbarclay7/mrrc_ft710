@@ -1,7 +1,10 @@
 import SwiftUI
 
-/// Single-row cycling controls: Mode · Band · Filter · ATT · IPO
-/// Each button cycles through its options on tap (轮转方式).
+/// Single-row selector controls: Mode · Band · Filter · ATT · IPO
+/// Each button opens a Menu (native dropdown) listing every option, rather
+/// than cycling one step per tap — a step is fine when there are 2-3
+/// choices, but band/mode/filter lists are long enough that stepping
+/// through them one at a time is tedious.
 struct QuickControlsRow: View {
     @EnvironmentObject var viewModel: RadioViewModel
 
@@ -11,22 +14,12 @@ struct QuickControlsRow: View {
         RadioState.uiModes.firstIndex(of: viewModel.state.modeName) ?? 1
     }
 
-    private func cycleMode() {
-        let idx = (modeIndex + 1) % RadioState.uiModes.count
-        viewModel.setMode(RadioState.uiModes[idx])
-    }
-
     // MARK: - Band
 
     private var bandIndex: Int {
         RadioState.bands.firstIndex(where: {
             $0.start <= viewModel.state.activeFreq && viewModel.state.activeFreq <= $0.end
         }) ?? 5
-    }
-
-    private func cycleBand() {
-        let idx = (bandIndex + 1) % RadioState.bands.count
-        viewModel.setBand(RadioState.bands[idx].defaultFreq)
     }
 
     // MARK: - Filter
@@ -44,11 +37,6 @@ struct QuickControlsRow: View {
         return filterWidths.firstIndex(where: { $0.1 == hz }) ?? 0
     }
 
-    private func cycleFilter() {
-        let idx = (filterIndex + 1) % filterWidths.count
-        viewModel.setFilter(filterWidths[idx].0)
-    }
-
     // MARK: - ATT (CAT index: 0=OFF, 1=6dB, 2=12dB, 3=18dB)
 
     private let attValues: [Int] = [0, 1, 2, 3]
@@ -56,11 +44,6 @@ struct QuickControlsRow: View {
 
     private var attIndex: Int {
         attValues.firstIndex(of: viewModel.state.attenuator) ?? 0
-    }
-
-    private func cycleATT() {
-        let idx = (attIndex + 1) % attValues.count
-        viewModel.setAttenuator(attValues[idx])
     }
 
     // MARK: - IPO (preamp: 0=OFF, 1=AMP1, 2=AMP2)
@@ -72,39 +55,44 @@ struct QuickControlsRow: View {
         ipoValues.firstIndex(of: viewModel.state.preamp) ?? 0
     }
 
-    private func cycleIPO() {
-        let idx = (ipoIndex + 1) % ipoValues.count
-        viewModel.setPreamp(ipoValues[idx])
-    }
-
     // MARK: - Body
 
     var body: some View {
         HStack(spacing: 4) {
-            CycleTapButton(
+            SelectorButton(
                 label: viewModel.state.modeDisplay,
                 color: .radioAccent,
-                action: cycleMode
+                options: RadioState.uiModes.map { mode in
+                    (label: mode, action: { viewModel.setMode(mode) })
+                }
             )
-            CycleTapButton(
+            SelectorButton(
                 label: RadioState.bands[bandIndex].name,
                 color: .radioAccent,
-                action: cycleBand
+                options: RadioState.bands.map { band in
+                    (label: band.name, action: { viewModel.setBand(band.defaultFreq) })
+                }
             )
-            CycleTapButton(
+            SelectorButton(
                 label: formatFilter(),
                 color: .radioAccent,
-                action: cycleFilter
+                options: filterWidths.map { idx, hz in
+                    (label: hz >= 1000 ? "\(hz/1000)k" : "\(hz)", action: { viewModel.setFilter(idx) })
+                }
             )
-            CycleTapButton(
+            SelectorButton(
                 label: attLabels[attIndex],
                 color: attValues[attIndex] == 0 ? .radioMuted : .radioAccent,
-                action: cycleATT
+                options: attValues.indices.map { i in
+                    (label: attLabels[i], action: { viewModel.setAttenuator(attValues[i]) })
+                }
             )
-            CycleTapButton(
+            SelectorButton(
                 label: ipoLabels[ipoIndex],
                 color: ipoValues[ipoIndex] == 0 ? .radioMuted : .radioAccent,
-                action: cycleIPO
+                options: ipoValues.indices.map { i in
+                    (label: ipoLabels[i], action: { viewModel.setPreamp(ipoValues[i]) })
+                }
             )
         }
         .padding(.horizontal, 6)
@@ -116,15 +104,19 @@ struct QuickControlsRow: View {
     }
 }
 
-// MARK: - Cycle Tap Button (轮转：点按循环)
+// MARK: - Selector Button (native Menu dropdown)
 
-struct CycleTapButton: View {
+struct SelectorButton: View {
     let label: String
     let color: Color
-    let action: () -> Void
+    let options: [(label: String, action: () -> Void)]
 
     var body: some View {
-        Button(action: action) {
+        Menu {
+            ForEach(options.indices, id: \.self) { i in
+                Button(options[i].label, action: options[i].action)
+            }
+        } label: {
             Text(label)
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
                 .foregroundColor(.black)

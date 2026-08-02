@@ -20,12 +20,12 @@
 		3244F72B1772787E8A6F75B0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 64CCC233626EE1943F7A2A9B /* Assets.xcassets */; };
 		353ABF0B86F00182614C23F0 /* MainRXView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B213691E8629DDB947FFC82C /* MainRXView.swift */; };
 		40B0A078D2B2E0EF4DA20AE5 /* MemoryChannelsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF987F7D69693580D861684F /* MemoryChannelsManager.swift */; };
-		5329F94F27C447A715A7CD11 /* MemoryChannelsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1966D9EFC41E35228B8B7C83 /* MemoryChannelsView.swift */; };
 		584908848AFDF1944FE85C6D /* TunerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1887F7829F4094CB16B0C0DD /* TunerView.swift */; };
 		648B2185BDD918B194FCA284 /* ConnectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA35D4D362BF3B541D7EE8A5 /* ConnectionManager.swift */; };
 		801DEF3F460117D1284A1B3D /* FilterSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA7F707392BC5E4B981E6AFE /* FilterSelectorView.swift */; };
 		81D6FE36922533D348B8AF93 /* DSPPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C383D9A97FCEC5E407A668BD /* DSPPanelView.swift */; };
 		8219B49AE37B490BC45417E3 /* DSPQuickButtons.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC161307F2311893A0593949 /* DSPQuickButtons.swift */; };
+		922DF99CCB815955B25AA292 /* MainScreenSlotsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12C342D822E2FEBDC927D431 /* MainScreenSlotsView.swift */; };
 		981EFFF44A66747BDACCEEBD /* TuningControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E17C98D145A8D70258962D6 /* TuningControls.swift */; };
 		9F47D93C40841C1E30625DF1 /* PTTFooter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0772FFB0145D0BC1F9B601 /* PTTFooter.swift */; };
 		A0D5064F92F5B75ED0FA32AA /* OpusEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF74DEA1C9A60039A4A0FB54 /* OpusEncoder.swift */; };
@@ -37,7 +37,6 @@
 		AC77ECA6664A3DFE3949E426 /* RadioState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79F849B007EFCA1C1B25D92F /* RadioState.swift */; };
 		B0A3E7F55E09E6C30A0BC5D5 /* AudioPlaybackManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE0A084FE2099A1A0BA6AD87 /* AudioPlaybackManager.swift */; };
 		B468A2D9A3B93CD4885C7557 /* AudioSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25941872CAA06326CD9DCA88 /* AudioSessionManager.swift */; };
-		BC3B135E1A4DD7CFC55D29C3 /* MemoryChannelsGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 679A21D971327DED4B3700A0 /* MemoryChannelsGrid.swift */; };
 		BE31368B091EC95505CEE2C0 /* SpectrumProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 339927CA5FEABE608B6E67F6 /* SpectrumProcessor.swift */; };
 		BFDEB099AF669F554FEFD42F /* WebSocketConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 599667BB247E4B195330A60F /* WebSocketConnection.swift */; };
 		C958045326E902C993900ED6 /* SMeterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 571C8D0AF256B0A4ECC8933B /* SMeterView.swift */; };
@@ -55,9 +54,9 @@
 		01531871C03097520A3500A9 /* opus_multistream.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = opus_multistream.h; sourceTree = "<group>"; };
 		03A6BD94BCEF0DBF26311355 /* Colors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Colors.swift; sourceTree = "<group>"; };
 		0442B8F002C443CF467092C9 /* FFTLineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFTLineView.swift; sourceTree = "<group>"; };
+		12C342D822E2FEBDC927D431 /* MainScreenSlotsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainScreenSlotsView.swift; sourceTree = "<group>"; };
 		15CA07577EF83D38FC3CFDD3 /* opus_projection.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = opus_projection.h; sourceTree = "<group>"; };
 		1887F7829F4094CB16B0C0DD /* TunerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TunerView.swift; sourceTree = "<group>"; };
-		1966D9EFC41E35228B8B7C83 /* MemoryChannelsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryChannelsView.swift; sourceTree = "<group>"; };
 		1A206EC58D51F49CAEF76658 /* FrequencyDisplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrequencyDisplay.swift; sourceTree = "<group>"; };
 		1E17C98D145A8D70258962D6 /* TuningControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TuningControls.swift; sourceTree = "<group>"; };
 		241EDD210F3B482D105688BB /* ErrorAlertView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorAlertView.swift; sourceTree = "<group>"; };
@@ -75,7 +74,6 @@
 		599667BB247E4B195330A60F /* WebSocketConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketConnection.swift; sourceTree = "<group>"; };
 		64CCC233626EE1943F7A2A9B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		67370F6B2FECFCCDEADEC3CD /* opus.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = opus.h; sourceTree = "<group>"; };
-		679A21D971327DED4B3700A0 /* MemoryChannelsGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryChannelsGrid.swift; sourceTree = "<group>"; };
 		75A3B8FD0CC31411814FB37E /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		7749903EC42A6EF6AA18E574 /* BandSelectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandSelectorView.swift; sourceTree = "<group>"; };
 		77D0287AA65811A1995AA8CB /* HeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeaderView.swift; sourceTree = "<group>"; };
@@ -267,8 +265,7 @@
 				77D0287AA65811A1995AA8CB /* HeaderView.swift */,
 				A5FE5EF147D278798C3667A8 /* LoginView.swift */,
 				B213691E8629DDB947FFC82C /* MainRXView.swift */,
-				679A21D971327DED4B3700A0 /* MemoryChannelsGrid.swift */,
-				1966D9EFC41E35228B8B7C83 /* MemoryChannelsView.swift */,
+				12C342D822E2FEBDC927D431 /* MainScreenSlotsView.swift */,
 				902B42102F8B88B3287DC547 /* MeterBarView.swift */,
 				32918148C5CBA08CB773375B /* ModeSelectorView.swift */,
 				EF32903053E3E4C424148152 /* PerformanceMonitorView.swift */,
@@ -375,9 +372,8 @@
 				DC834C525888E31385236F82 /* HeaderView.swift in Sources */,
 				AA416A6B341406BF483DB3C2 /* LoginView.swift in Sources */,
 				353ABF0B86F00182614C23F0 /* MainRXView.swift in Sources */,
-				BC3B135E1A4DD7CFC55D29C3 /* MemoryChannelsGrid.swift in Sources */,
+				922DF99CCB815955B25AA292 /* MainScreenSlotsView.swift in Sources */,
 				40B0A078D2B2E0EF4DA20AE5 /* MemoryChannelsManager.swift in Sources */,
-				5329F94F27C447A715A7CD11 /* MemoryChannelsView.swift in Sources */,
 				F3C4641C77ECF03BBF0537C9 /* MeterBarView.swift in Sources */,
 				15597B60373BCED1D29C64EA /* ModeSelectorView.swift in Sources */,
 				A106D855410CE691B652D798 /* OpusBridge.c in Sources */,

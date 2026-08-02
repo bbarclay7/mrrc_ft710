@@ -21,16 +21,60 @@ final class AudioSessionManager: ObservableObject {
 
     /// Configure audio session for both TX and RX.
     func configureForTransceiver() throws {
-        try session.setCategory(.playAndRecord, mode: .voiceChat,
-                               options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP])
+        // .defaultToSpeaker used to be a category option here, which forces
+        // the speaker unconditionally — including overriding a hearing aid
+        // that was already the active route before the app launched. Instead,
+        // only override to speaker when nothing external is already
+        // connected, so a hearing aid (or any other accessory) already in
+        // use stays in use instead of getting silently swapped out.
+        // mode: .voiceChat is confirmed (via live diagnostic logging) to be
+        // what drops a Bluetooth LE hearing aid to the built-in Receiver —
+        // it requests VoIP-style echo cancellation the hearing aid's BLE
+        // audio profile doesn't support, so iOS silently falls back instead
+        // of erroring. mode: .default doesn't have that requirement.
+        //
+        // A first attempt at this crashed the app (AVAudioEngine
+        // "_outputFormat.channelCount == buffer.format.channelCount"): the
+        // real cause turned out to be a separate bug in AudioCaptureManager,
+        // whose mic input tap was installed once at prime time and never
+        // reinstalled against the current format on a route/config change —
+        // switching mode changed the hearing aid's negotiated input channel
+        // count, and the stale tap choked on the next buffer. That's fixed
+        // now (handleConfigChange removes and reinstalls the tap against
+        // the live format), so retrying .default here should be safe.
+        try session.setCategory(.playAndRecord, mode: .default,
+                               options: [.allowBluetooth, .allowBluetoothA2DP])
         // Best-effort: MFi/BLE hearing aids reject buffer durations this short and
         // throw here, which used to abort the whole function before setActive(true)
         // ran — silently blocking audio (to ANY route) whenever a hearing aid was paired.
         try? session.setPreferredIOBufferDuration(0.005)  // 5ms for low latency
         try session.setActive(true)
+        applyRouteOverride()
         isActive = true
         startObserving()
         print("✅ Audio session configured for transceiver mode")
+    }
+
+    private func hasExternalOutput() -> Bool {
+        session.currentRoute.outputs.contains {
+            $0.portType != .builtInSpeaker && $0.portType != .builtInReceiver
+        }
+    }
+
+    /// Decide speaker-vs-external on every activation, not just once at
+    /// launch. A single check right at startup raced a hearing aid's
+    /// Bluetooth LE handshake, which can settle a beat after our check ran —
+    /// the override stuck at "speaker" even though the aid then connected.
+    /// Re-running this on every route-change notification means a
+    /// late-arriving hearing aid still wins, and clearing any previous
+    /// override (rather than only ever adding one) lets it actually take
+    /// effect instead of fighting a stale forced-speaker override.
+    private func applyRouteOverride() {
+        if hasExternalOutput() {
+            try? session.overrideOutputAudioPort(.none)
+        } else {
+            try? session.overrideOutputAudioPort(.speaker)
+        }
     }
 
     private func startObserving() {
@@ -48,6 +92,7 @@ final class AudioSessionManager: ObservableObject {
     @objc private func handleRouteChange(notification: Notification) {
         print("🔄 Audio route changed")
         try? session.setActive(true)
+        applyRouteOverride()
         NotificationCenter.default.post(name: .audioSessionNeedsEngineRestart, object: nil)
     }
 

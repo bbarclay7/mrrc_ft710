@@ -3,6 +3,8 @@ import SwiftUI
 /// Top header: status dots + VFO A/B + S-meter reading + power toggle.
 struct HeaderView: View {
     @EnvironmentObject var viewModel: RadioViewModel
+    @State private var showFreqEntry = false
+    @State private var freqEntryText = ""
 
     var body: some View {
         VStack(spacing: 2) {
@@ -56,12 +58,32 @@ struct HeaderView: View {
                 }
             }
 
-            // Row 2: Frequency display (fills row)
+            // Row 2: Frequency display (fills row) — tap to enter directly
             FrequencyDisplayView(freqHz: viewModel.state.activeFreq)
                 .padding(.horizontal, 4)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    freqEntryText = ""
+                    showFreqEntry = true
+                }
+                .alert("Enter Frequency (kHz)", isPresented: $showFreqEntry) {
+                    TextField("14074", text: $freqEntryText)
+                        .keyboardType(.numberPad)
+                    Button("Set") {
+                        if let khz = Int(freqEntryText) {
+                            viewModel.setFrequency(khz * 1000)
+                        }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                }
 
-            // Row 3: Band name
+            // Row 3: UTC clock (left) + band name (right)
             HStack {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text(Self.utcTimeString(context.date))
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundColor(.radioMuted)
+                }
                 Spacer()
                 Text(viewModel.state.bandName)
                     .font(.system(size: 14, weight: .bold)).foregroundColor(.radioAccent)
@@ -75,5 +97,20 @@ struct HeaderView: View {
             Circle().fill(on ? Color.green : Color.red).frame(width: 8, height: 8)
             Text(label).font(.system(size: 12, weight: .bold)).foregroundColor(.radioMuted)
         }
+    }
+
+    private static var utcCalendar: Calendar = {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        return cal
+    }()
+
+    private static let weekdayAbbrevs = ["", "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
+
+    private static func utcTimeString(_ date: Date) -> String {
+        let c = utcCalendar.dateComponents([.year, .month, .day, .hour, .minute, .second, .weekday], from: date)
+        let day = weekdayAbbrevs[c.weekday ?? 0]
+        return String(format: "%@ %04d-%02d-%02d %02d:%02d:%02dZ",
+                       day, c.year ?? 0, c.month ?? 0, c.day ?? 0, c.hour ?? 0, c.minute ?? 0, c.second ?? 0)
     }
 }
