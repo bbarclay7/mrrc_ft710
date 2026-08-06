@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var tuneStep: Int = 1000  // Hz, matches web default
     @State private var storeArmed = false
     @State private var memPage = 0
+    @AppStorage("enableEnhancements") private var enableEnhancements = false
 
     var body: some View {
         ZStack {
@@ -137,17 +138,16 @@ struct ContentView: View {
                                 .font(.system(size: 14, weight: .bold)).foregroundColor(.radioAccent)
                                 .frame(width: 44, height: 38).background(Color.radioSurface).cornerRadius(4)
                         }
-                        // Step selector — tap to pick a step size directly
-                        Menu {
-                            ForEach([10, 100, 250, 1000, 5000, 10000, 25000, 50000, 100000, 1000000], id: \.self) { step in
-                                Button(stepLabel(step)) { tuneStep = step }
-                            }
-                        } label: {
-                            Text(stepLabel(tuneStep))
-                                .font(.system(size: 17, weight: .bold, design: .monospaced))
-                                .foregroundColor(.radioAccent)
-                                .frame(width: 74, height: 38).background(Color.radioAccent.opacity(0.2)).cornerRadius(4)
-                        }
+                        // Step selector — tap to pick a step size directly.
+                        // Wrapped in an Equatable subview + .equatable(): this
+                        // whole screen re-renders very often (S-meter/freq
+                        // update many times a second via CAT polling), and
+                        // without this an open Menu's content gets rebuilt
+                        // mid-tap — the first couple of taps land on a menu
+                        // item about to be replaced, same bug hit in
+                        // QuickControlsRow's Mode/Band/Filter/ATT/IPO menus.
+                        StepSelectorButton(tuneStep: tuneStep, onSelect: { tuneStep = $0 })
+                            .equatable()
                         // Slow right (+1× step)
                         Button(action: { viewModel.stepFrequency(up: true, step: tuneStep) }) {
                             Image(systemName: "chevron.right")
@@ -225,13 +225,19 @@ struct ContentView: View {
                             }.disabled(memPage == pageCount - 1)
                         }
                         Spacer()
-                        Button(action: { storeArmed.toggle() }) {
-                            Text("STO")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(storeArmed ? .black : .radioAccent)
-                                .padding(.horizontal, 10).padding(.vertical, 3)
-                                .background(storeArmed ? Color.radioAccent : Color.radioSurface)
-                                .cornerRadius(4)
+                        // Gated: with this off, storeArmed can never become
+                        // true, so the M-button tap below always falls
+                        // through to the plain recallMemory branch — exactly
+                        // matching original (save-less) upstream behavior.
+                        if enableEnhancements {
+                            Button(action: { storeArmed.toggle() }) {
+                                Text("STO")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(storeArmed ? .black : .radioAccent)
+                                    .padding(.horizontal, 10).padding(.vertical, 3)
+                                    .background(storeArmed ? Color.radioAccent : Color.radioSurface)
+                                    .cornerRadius(4)
+                            }
                         }
                     }.padding(.horizontal, 6)
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 4) {
@@ -294,13 +300,15 @@ struct ContentView: View {
                                 .foregroundColor(viewModel.audioCapture.isRecording ? .red : .radioText)
                                 .frame(width: 80, height: 96).background(Color.radioSurface).cornerRadius(8)
                         }
-                        Button(action: { viewModel.runTunerAssist() }) {
-                            Image(systemName: viewModel.state.tunerAssistRunning ? "hourglass" : "dial.low")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(viewModel.state.tunerAssistRunning ? .radioMuted : .radioAccent)
-                                .frame(width: 56, height: 96).background(Color.radioSurface).cornerRadius(8)
+                        if enableEnhancements {
+                            Button(action: { viewModel.runTunerAssist() }) {
+                                Image(systemName: viewModel.state.tunerAssistRunning ? "hourglass" : "dial.low")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundColor(viewModel.state.tunerAssistRunning ? .radioMuted : .radioAccent)
+                                    .frame(width: 56, height: 96).background(Color.radioSurface).cornerRadius(8)
+                            }
+                            .disabled(viewModel.state.tunerAssistRunning)
                         }
-                        .disabled(viewModel.state.tunerAssistRunning)
                     }.padding(.horizontal, 8).padding(.vertical, 4).background(Color.radioBg.opacity(0.97))
                 }
             }
@@ -313,14 +321,37 @@ struct ContentView: View {
         }
     }
 
-    /// Format step size label: 10→"10Hz", 1000→"1kHz", 1000000→"1MHz", etc.
-    private func stepLabel(_ hz: Int) -> String {
-        if hz >= 1_000_000 {
-            return "\(hz / 1_000_000)MHz"
-        } else if hz >= 1000 {
-            return "\(hz / 1000)kHz"
+}
+
+/// Format step size label: 10→"10Hz", 1000→"1kHz", 1000000→"1MHz", etc.
+private func stepLabel(_ hz: Int) -> String {
+    if hz >= 1_000_000 {
+        return "\(hz / 1_000_000)MHz"
+    } else if hz >= 1000 {
+        return "\(hz / 1000)kHz"
+    }
+    return "\(hz)Hz"
+}
+
+/// Equatable so `.equatable()` can skip rebuilding the open Menu's content
+/// when tuneStep hasn't actually changed — see the comment at the call site.
+private struct StepSelectorButton: View, Equatable {
+    let tuneStep: Int
+    let onSelect: (Int) -> Void
+
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.tuneStep == rhs.tuneStep }
+
+    var body: some View {
+        Menu {
+            ForEach([10, 100, 250, 1000, 5000, 10000, 25000, 50000, 100000, 1000000], id: \.self) { step in
+                Button(stepLabel(step)) { onSelect(step) }
+            }
+        } label: {
+            Text(stepLabel(tuneStep))
+                .font(.system(size: 17, weight: .bold, design: .monospaced))
+                .foregroundColor(.radioAccent)
+                .frame(width: 74, height: 38).background(Color.radioAccent.opacity(0.2)).cornerRadius(4)
         }
-        return "\(hz)Hz"
     }
 }
 

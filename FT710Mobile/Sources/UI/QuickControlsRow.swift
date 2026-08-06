@@ -62,38 +62,33 @@ struct QuickControlsRow: View {
             SelectorButton(
                 label: viewModel.state.modeDisplay,
                 color: .radioAccent,
-                options: RadioState.uiModes.map { mode in
-                    (label: mode, action: { viewModel.setMode(mode) })
-                }
-            )
+                optionLabels: RadioState.uiModes,
+                onSelect: { i in viewModel.setMode(RadioState.uiModes[i]) }
+            ).equatable()
             SelectorButton(
                 label: RadioState.bands[bandIndex].name,
                 color: .radioAccent,
-                options: RadioState.bands.map { band in
-                    (label: band.name, action: { viewModel.setBand(band.defaultFreq) })
-                }
-            )
+                optionLabels: RadioState.bands.map(\.name),
+                onSelect: { i in viewModel.setBand(RadioState.bands[i].defaultFreq) }
+            ).equatable()
             SelectorButton(
                 label: formatFilter(),
                 color: .radioAccent,
-                options: filterWidths.map { idx, hz in
-                    (label: hz >= 1000 ? "\(hz/1000)k" : "\(hz)", action: { viewModel.setFilter(idx) })
-                }
-            )
+                optionLabels: filterWidths.map { $0.1 >= 1000 ? "\($0.1/1000)k" : "\($0.1)" },
+                onSelect: { i in viewModel.setFilter(filterWidths[i].0) }
+            ).equatable()
             SelectorButton(
                 label: attLabels[attIndex],
                 color: attValues[attIndex] == 0 ? .radioMuted : .radioAccent,
-                options: attValues.indices.map { i in
-                    (label: attLabels[i], action: { viewModel.setAttenuator(attValues[i]) })
-                }
-            )
+                optionLabels: attLabels,
+                onSelect: { i in viewModel.setAttenuator(attValues[i]) }
+            ).equatable()
             SelectorButton(
                 label: ipoLabels[ipoIndex],
                 color: ipoValues[ipoIndex] == 0 ? .radioMuted : .radioAccent,
-                options: ipoValues.indices.map { i in
-                    (label: ipoLabels[i], action: { viewModel.setPreamp(ipoValues[i]) })
-                }
-            )
+                optionLabels: ipoLabels,
+                onSelect: { i in viewModel.setPreamp(ipoValues[i]) }
+            ).equatable()
         }
         .padding(.horizontal, 6)
     }
@@ -106,15 +101,33 @@ struct QuickControlsRow: View {
 
 // MARK: - Selector Button (native Menu dropdown)
 
-struct SelectorButton: View {
+/// Equatable so `.equatable()` can skip rebuilding this view's body — and
+/// therefore the Menu's presented content — when nothing it actually
+/// displays has changed. Without this, QuickControlsRow re-renders every
+/// time ANY @Published field on the shared RadioState changes (S-meter and
+/// frequency update many times a second from CAT polling), which tears
+/// down and rebuilds an OPEN Menu's content mid-tap: the first couple of
+/// taps land on a menu item that's about to be replaced, and the menu
+/// eventually closes on whichever selection wins that race — exactly the
+/// "first taps do nothing, then it picks something almost at random"
+/// behavior reported in testing. onSelect and color are deliberately
+/// excluded from equality: closures aren't Equatable, and color is always
+/// a pure function of the same index that produces the label, so label
+/// alone is enough to detect a real change.
+struct SelectorButton: View, Equatable {
     let label: String
     let color: Color
-    let options: [(label: String, action: () -> Void)]
+    let optionLabels: [String]
+    let onSelect: (Int) -> Void
+
+    static func == (lhs: SelectorButton, rhs: SelectorButton) -> Bool {
+        lhs.label == rhs.label && lhs.optionLabels == rhs.optionLabels
+    }
 
     var body: some View {
         Menu {
-            ForEach(options.indices, id: \.self) { i in
-                Button(options[i].label, action: options[i].action)
+            ForEach(optionLabels.indices, id: \.self) { i in
+                Button(optionLabels[i]) { onSelect(i) }
             }
         } label: {
             Text(label)

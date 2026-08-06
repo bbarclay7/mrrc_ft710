@@ -5,6 +5,7 @@ struct HeaderView: View {
     @EnvironmentObject var viewModel: RadioViewModel
     @State private var showFreqEntry = false
     @State private var freqEntryText = ""
+    @AppStorage("enableEnhancements") private var enableEnhancements = false
 
     var body: some View {
         VStack(spacing: 2) {
@@ -59,30 +60,39 @@ struct HeaderView: View {
             }
 
             // Row 2: Frequency display (fills row) — tap to enter directly
-            FrequencyDisplayView(freqHz: viewModel.state.activeFreq)
-                .padding(.horizontal, 4)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    freqEntryText = ""
-                    showFreqEntry = true
-                }
-                .alert("Enter Frequency (kHz)", isPresented: $showFreqEntry) {
-                    TextField("14074", text: $freqEntryText)
-                        .keyboardType(.numberPad)
-                    Button("Set") {
-                        if let khz = Int(freqEntryText) {
-                            viewModel.setFrequency(khz * 1000)
+            // (gated: enhancements off means no tap gesture at all, matching
+            // original upstream behavior where this display isn't interactive)
+            Group {
+                if enableEnhancements {
+                    FrequencyDisplayView(freqHz: viewModel.state.activeFreq)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            freqEntryText = ""
+                            showFreqEntry = true
                         }
-                    }
-                    Button("Cancel", role: .cancel) {}
+                        .alert("Enter Frequency (kHz)", isPresented: $showFreqEntry) {
+                            TextField("14074", text: $freqEntryText)
+                                .keyboardType(.numberPad)
+                            Button("Set") {
+                                if let khz = Int(freqEntryText) {
+                                    viewModel.setFrequency(khz * 1000)
+                                }
+                            }
+                            Button("Cancel", role: .cancel) {}
+                        }
+                } else {
+                    FrequencyDisplayView(freqHz: viewModel.state.activeFreq)
                 }
+            }.padding(.horizontal, 4)
 
-            // Row 3: UTC clock (left) + band name (right)
+            // Row 3: UTC clock (left, if enabled) + band name (right)
             HStack {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(Self.utcTimeString(context.date))
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundColor(.radioMuted)
+                if enableEnhancements {
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        Text(Self.utcTimeString(context.date))
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .foregroundColor(.radioMuted)
+                    }
                 }
                 Spacer()
                 Text(viewModel.state.bandName)

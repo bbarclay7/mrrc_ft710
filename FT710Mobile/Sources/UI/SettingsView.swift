@@ -10,13 +10,28 @@ struct SettingsView: View {
     @AppStorage("mainScreenShow_rfPower") private var showRFPower = true
     @AppStorage("mainScreenShow_squelch") private var showSquelch = true
     @AppStorage("mainScreenShow_rfGain") private var showRFGain = true
-    @AppStorage("mainScreenShow_scopeSpan") private var showScopeSpan = true
     @AppStorage("mainScreenShow_waterfallOffset") private var showWaterfallOffset = false
+    // Bundles every feature added on this fork that doesn't exist upstream
+    // (Tuner Assist, memory-store workflow, UTC clock, direct frequency
+    // entry) behind one switch, default off — so merging this fork's
+    // changes upstream is a no-op for existing users until they opt in,
+    // rather than needing a separate toggle per feature.
+    @AppStorage("enableEnhancements") private var enableEnhancements = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
+                    // Enhancements — fork-specific additions with no
+                    // upstream equivalent, opt-in so they don't change
+                    // default behavior for anyone who doesn't want them.
+                    SettingsCard(title: "Enhancements", icon: "sparkles") {
+                        Toggle("Enable Enhancements", isOn: $enableEnhancements)
+                            .font(.subheadline).tint(.radioAccent)
+                        Text("Tuner Assist, memory-slot store, UTC clock, and tap-to-enter frequency.")
+                            .font(.caption2).foregroundColor(.radioMuted)
+                    }
+
                     // Server
                     SettingsCard(title: "Server", icon: "server.rack") {
                         HStack {
@@ -42,7 +57,6 @@ struct SettingsView: View {
                         Toggle("Power", isOn: $showRFPower).font(.subheadline).tint(.radioAccent)
                         Toggle("Squelch", isOn: $showSquelch).font(.subheadline).tint(.radioAccent)
                         Toggle("RF Gain", isOn: $showRFGain).font(.subheadline).tint(.radioAccent)
-                        Toggle("Span", isOn: $showScopeSpan).font(.subheadline).tint(.radioAccent)
                         Toggle("Waterfall Offset", isOn: $showWaterfallOffset).font(.subheadline).tint(.radioAccent)
                     }
 
@@ -67,14 +81,16 @@ struct SettingsView: View {
                             set: { viewModel.setRFPower(Int($0)) }
                         ), in: 5...100, step: 5).tint(.radioRed)
 
-                        Button(action: { viewModel.runTunerAssist() }) {
-                            Label(viewModel.state.tunerAssistRunning ? "Tuning…" : "Tuner Assist",
-                                  systemImage: "dial.low")
+                        if enableEnhancements {
+                            Button(action: { viewModel.runTunerAssist() }) {
+                                Label(viewModel.state.tunerAssistRunning ? "Tuning…" : "Tuner Assist",
+                                      systemImage: "dial.low")
+                            }
+                            .disabled(viewModel.state.tunerAssistRunning)
+                            .foregroundColor(.radioAccent).buttonStyle(.bordered)
+                            Text("Drops to 10W, keys a steady carrier for 5s for an external auto-tuner, then restores power.")
+                                .font(.caption2).foregroundColor(.radioMuted)
                         }
-                        .disabled(viewModel.state.tunerAssistRunning)
-                        .foregroundColor(.radioAccent).buttonStyle(.bordered)
-                        Text("Drops to 10W, keys a steady carrier for 5s for an external auto-tuner, then restores power.")
-                            .font(.caption2).foregroundColor(.radioMuted)
 
                         HStack {
                             Text("TX Timeout").font(.subheadline)
@@ -169,8 +185,6 @@ struct SettingsView: View {
                         Button("Start Tuner") {
                             viewModel.setTuner(1)
                         }.foregroundColor(.radioAccent).buttonStyle(.bordered)
-
-                        ScopeSpanSelector(viewModel: viewModel)
                     }
 
                     // About
@@ -323,16 +337,3 @@ struct InlineGainSlider: View {
     }
 }
 
-struct ScopeSpanSelector: View {
-    @ObservedObject var viewModel: RadioViewModel
-    var body: some View {
-        Picker("Scope Span", selection: Binding(
-            get: { viewModel.state.scopeSpan },
-            set: { viewModel.setScopeSpan($0) }
-        )) {
-            ForEach(Array(RadioState.scopeSpanLabels.keys.sorted()), id: \.self) { k in
-                Text(RadioState.scopeSpanLabels[k] ?? "?").tag(k)
-            }
-        }.pickerStyle(.menu).tint(.radioAccent)
-    }
-}

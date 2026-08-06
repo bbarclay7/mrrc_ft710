@@ -8,7 +8,6 @@ struct MainScreenSlotsView: View {
     @AppStorage("mainScreenShow_rfPower") private var showRFPower = true
     @AppStorage("mainScreenShow_squelch") private var showSquelch = true
     @AppStorage("mainScreenShow_rfGain") private var showRFGain = true
-    @AppStorage("mainScreenShow_scopeSpan") private var showScopeSpan = true
     @AppStorage("mainScreenShow_waterfallOffset") private var showWaterfallOffset = false
 
     private var visibleControls: [RadioState.MainScreenControl] {
@@ -16,7 +15,6 @@ struct MainScreenSlotsView: View {
             showRFPower ? .rfPower : nil,
             showSquelch ? .squelch : nil,
             showRFGain ? .rfGain : nil,
-            showScopeSpan ? .scopeSpan : nil,
             showWaterfallOffset ? .waterfallOffset : nil,
         ].compactMap { $0 }
     }
@@ -62,11 +60,6 @@ private struct MainScreenSlotRow: View {
                 get: { Double(viewModel.state.rfGain) },
                 set: { viewModel.setRFGain(Int($0)) }
             ), in: 0...255, step: 5).tint(.radioAccent)
-        case .scopeSpan:
-            Slider(value: Binding(
-                get: { Double(viewModel.state.scopeSpan) },
-                set: { viewModel.setScopeSpan(Int($0)) }
-            ), in: 0...9, step: 1).tint(.radioAccent)
         case .waterfallOffset:
             Slider(value: Binding(
                 get: { Double(viewModel.spectrumProc.userOffset) },
@@ -80,7 +73,6 @@ private struct MainScreenSlotRow: View {
         case .rfPower: return "\(viewModel.state.rfPower)W"
         case .squelch: return "\(viewModel.state.squelch)"
         case .rfGain: return "\(viewModel.state.rfGain)"
-        case .scopeSpan: return RadioState.scopeSpanLabels[viewModel.state.scopeSpan] ?? "?"
         case .waterfallOffset: return "\(Int(viewModel.spectrumProc.userOffset))"
         }
     }

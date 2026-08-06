@@ -135,27 +135,31 @@ final class RadioState: ObservableObject {
         5: 50000, 6: 100000, 7: 200000, 8: 500000, 9: 1000000,
     ]
 
-    static let scopeSpanLabels: [Int: String] = [
-        0: "1 kHz", 1: "2 kHz", 2: "5 kHz", 3: "10 kHz", 4: "20 kHz",
-        5: "50 kHz", 6: "100 kHz", 7: "200 kHz", 8: "500 kHz", 9: "1 MHz",
-    ]
-
     /// Controls the user can show on the main screen (Settings → Main Screen
     /// toggles each on/off), instead of every knob living only in Settings.
     enum MainScreenControl: String, CaseIterable, Identifiable {
-        // DNR and NR level are both intentionally absent: the FT-710 has no
-        // CAT command for either ("DN;" is the VFO step-down command on this
-        // radio, and "NR" is a plain on/off toggle with no level parameter —
-        // "RL" isn't a real FT-710 command at all). NR on/off already has its
-        // own toggle elsewhere; no UI is exposed for what the hardware can't do.
-        case rfPower, squelch, rfGain, scopeSpan, waterfallOffset
+        // DNR, NR level, and scope span are all intentionally absent. DNR/NR
+        // level: the FT-710 has no CAT command for either ("DN;" is the VFO
+        // step-down command on this radio, and "NR" is a plain on/off toggle
+        // with no level parameter — "RL" isn't a real FT-710 command at
+        // all). Scope span: the CAT SS05 command is real and correctly
+        // implemented, but confirmed live to have no effect on this app's
+        // waterfall — the FT4222-tapped raw scope data only responds to the
+        // radio's own physical front-panel span control (the same
+        // front-panel-only behavior already found for CENTER/FIX mode), and
+        // there's no reliable way to read the true current span back either
+        // (its frame-metadata field is garbage — see scope_mode's history).
+        // Touching this slider couldn't change the real waveform and would
+        // only desync the frequency-axis labels from it. NR on/off already
+        // has its own toggle elsewhere; no UI is exposed for what the
+        // hardware can't do.
+        case rfPower, squelch, rfGain, waterfallOffset
         var id: String { rawValue }
         var label: String {
             switch self {
             case .rfPower: return "Power"
             case .squelch: return "Squelch"
             case .rfGain: return "RF Gain"
-            case .scopeSpan: return "Span"
             case .waterfallOffset: return "WF Offset"
             }
         }
